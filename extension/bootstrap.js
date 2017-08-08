@@ -1,6 +1,13 @@
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm")
-Components.utils.import("resource://gre/modules/PopupNotifications.jsm");
+const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/Preferences.jsm")
+Cu.import("resource://gre/modules/PopupNotifications.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "studyUtils",
+  "resource://tracking-protection-study/StudyUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "config",
+  "resource://tracking-protection-study/Config.jsm");
 
 const UI_AVAILABLE_NOTIFICATION = "sessionstore-windows-restored";
 const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
@@ -32,8 +39,7 @@ function openDoorhanger(win) {
   doorhanger.show(win.gBrowser.selectedBrowser, DOORHANGER_ID, DOORHANGER_MESSAGE,
     null, action, [], options);
 
-  const prefs = new Preferences({ defaultBranch: true });
-  prefs.set(TRACKING_PROTECTION_PREF, true);
+  return doorhanger;
 }
 
 /**
@@ -71,5 +77,11 @@ this.startup = function() {
 };
 
 this.shutdown = function() {};
-this.install = function() {};
-this.uninstall = function() {};
+this.install = function() {
+  const prefs = new Preferences();
+  prefs.set(TRACKING_PROTECTION_PREF, true);
+};
+this.uninstall = function() {
+  const prefs = new Preferences();
+  prefs.set(TRACKING_PROTECTION_PREF, false);
+};
