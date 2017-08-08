@@ -1,0 +1,30 @@
+{
+  "name": "tracking-protection-study",
+  "version": "1.0.0",
+  "description": "Extension that enables tracking protection based on specific calls to action in download pages.",
+  "main": "bootstrap.js",
+  "repository": "https://github.com/rhelmer/tracking-protection-study.git",
+  "author": "Mozilla",
+  "license": "MPL-2.0",
+  "dependencies": {
+    "eslint-plugin-mozilla": "^0.3.4",
+    "fs-extra": "^3.0.1",
+    "fx-runner": "^1.0.6",
+    "geckodriver": "^1.7.1",
+    "mocha": "^3.4.2",
+    "path": "^0.12.7",
+    "selenium-webdriver": "^3.4.0"
+  },
+  "devDependencies": {
+    "eslint": "^4.0.0",
+    "eslint-config-airbnb-base": "^11.2.0",
+    "eslint-plugin-import": "^2.5.0"
+  },
+  "scripts": {
+    "postinstall": "./bin/patch_webdriver.sh",
+    "lint": "eslint .",
+    "build": "./bin/make_xpi.sh",
+    "test": "export FIREFOX_BINARY=firefox XPI_NAME=extension/tracking-protection-study.xpi && npm run build && mocha test --retry 2",
+    "man": "export FIREFOX_BINARY=firefox XPI_NAME=extension/tracking-protection-study.xpi && npm run build && node manual_test.js"
+  }
+}
