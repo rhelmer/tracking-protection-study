@@ -4,13 +4,15 @@ const EXPORTED_SYMBOLS = ["config"];
 const config = {
   study: {
     studyName: "tracking-protection-study", // no spaces, for all the reasons
+    /*
     variation: {
       name: "ALL",
     }, // optional, use to override/decide
+    */
     weightedVariations: [
       { name: "control", weight: 1 },
       { name: "doorhanger", weight: 1 },
-      { name: "highlight", weight: 1 },
+      { name: "opentab", weight: 1 },
     ],
     /** **endings**
       * - keys indicate the 'endStudy' even that opens these.
