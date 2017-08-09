@@ -12,7 +12,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "config",
 const UI_AVAILABLE_NOTIFICATION = "sessionstore-windows-restored";
 const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
 const DOORHANGER_ID = "onboarding-trackingprotection-confirmation";
-const DOORHANGER_MESSAGE = "Tracking protection is enabled.";
+const DOORHANGER_MESSAGE_1 = "Tracking protection is enabled, making Firefox super fast.";
+const DOORHANGER_MESSAGE_2 = "Tracking protection is enabled, blocking annoying ads.";
+const DOORHANGER_MESSAGE_3 = "Tracking protection is enabled, protecting your privacy.";
+const DOORHANGER_URL = "https://mozilla.org/learn-more-about-tp-study";
+const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
 const NEW_TAB_URL = "about:mozilla";
 
 const REASONS = {
@@ -48,14 +52,11 @@ this.TrackingProtectionStudy = {
    * @param {ChromeWindow} win
    */
   openDoorhanger(win) {
-    this.doorhanger = new PopupNotifications(win.gBrowser,
-      win.document.getElementById("notification-popup"),
-      win.document.getElementById("notification-popup-box"));
-
     const options = {
-      displayURI: "test123",
+      popupIconURL: DOORHANGER_ICON,
+      learnMoreURL: DOORHANGER_URL,
       persistent: true,
-      hideClose: true,
+      persistWhileVisible: true,
     };
 
     const action = {
@@ -64,7 +65,7 @@ this.TrackingProtectionStudy = {
       callback: () => {},
     };
 
-    this.doorhanger.show(win.gBrowser.selectedBrowser, DOORHANGER_ID, DOORHANGER_MESSAGE,
+    win.PopupNotifications.show(win.gBrowser.selectedBrowser, DOORHANGER_ID, DOORHANGER_MESSAGE_1,
       null, action, [], options);
   },
 
@@ -127,10 +128,6 @@ this.TrackingProtectionStudy = {
   uninit() {
     const prefs = new Preferences();
     prefs.set(TRACKING_PROTECTION_PREF, false);
-
-    if (this.doorhanger) {
-      this.doorhanger.remove();
-    }
   }
 }
 
