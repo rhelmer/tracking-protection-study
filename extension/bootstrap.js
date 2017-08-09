@@ -90,7 +90,6 @@ this.TrackingProtectionStudy = {
         }
       });
     } else if (this.treatment in this.TREATMENTS) {
-      console.log("rhelmer debug1");
       this.TREATMENTS[this.treatment](win, NEW_TAB_URL);
     }
 
