@@ -14,39 +14,6 @@ const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
 const DOORHANGER_ID = "onboarding-trackingprotection-notification";
 const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
 
-const CAMPAIGNS = {
-  "doorhanger": {
-    "campaign_ids": [
-      "doorhanger-1",
-      "doorhanger-2",
-      "doorhanger-3",
-    ],
-    "messages": [
-      "Tracking protection is enabled, making Firefox super fast.",
-      "Tracking protection is enabled, blocking annoying ads.",
-      "Tracking protection is enabled, protecting your privacy.",
-    ],
-    "urls": [
-      "https://mozilla.org/learn-more-about-tp-study#doorhanger-1",
-      "https://mozilla.org/learn-more-about-tp-study#doorhanger-2",
-      "https://mozilla.org/learn-more-about-tp-study#doorhanger-3",
-    ],
-  },
-  "opentab": {
-    "campaign_ids": [
-      "opentab-1",
-      "opentab-2",
-      "opentab-3",
-    ],
-    "messages": [],
-    "urls": [
-      "https://mozilla.org/learn-more-about-tp-study#opentab-1",
-      "https://mozilla.org/learn-more-about-tp-study#opentab-2",
-      "https://mozilla.org/learn-more-about-tp-study#opentab-3",
-    ],
-  }
-}
-
 const REASONS = {
   APP_STARTUP:      1, // The application is starting up.
   APP_SHUTDOWN:     2, // The application is shutting down.
@@ -138,12 +105,13 @@ this.TrackingProtectionStudy = {
     }
 
     this.treatment = studyUtils.getVariation().name;
+    let campaigns = config.study.campaigns;
 
     // FIXME decide which URL to use based on:
     // attribution.source attribution.medium attribution.campaign
     let campaign_id = "doorhanger-1"
-    if (this.treatment in CAMPAIGNS) {
-      let campaign = CAMPAIGNS[this.treatment];
+    if (this.treatment in campaigns) {
+      let campaign = campaigns[this.treatment];
       for (let i = 0; i < campaign.campaign_ids.length; i++) {
         if (campaign_id === campaign.campaign_ids[i]) {
           this.message = campaign.messages[i];

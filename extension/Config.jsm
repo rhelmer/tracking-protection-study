@@ -4,18 +4,51 @@ const EXPORTED_SYMBOLS = ["config"];
 const config = {
   study: {
     studyName: "tracking-protection-study", // no spaces, for all the reasons
-/*
+
     variation: {
-      name: "ALL",
+      name: "doorhanger",
     }, // optional, use to override/decide
-*/
+
     weightedVariations: [
       { name: "control", weight: 1 },
       { name: "doorhanger", weight: 1 },
       { name: "opentab", weight: 1 },
     ],
+
+    campaigns: {
+      "doorhanger": {
+        "campaign_ids": [
+          "doorhanger-1",
+          "doorhanger-2",
+          "doorhanger-3",
+        ],
+        "messages": [
+          "Tracking protection is enabled, making Firefox super fast.",
+          "Tracking protection is enabled, blocking annoying ads.",
+          "Tracking protection is enabled, protecting your privacy.",
+        ],
+        "urls": [
+          "https://mozilla.org/learn-more-about-tp-study#doorhanger-1",
+          "https://mozilla.org/learn-more-about-tp-study#doorhanger-2",
+          "https://mozilla.org/learn-more-about-tp-study#doorhanger-3",
+        ],
+      },
+      "opentab": {
+        "campaign_ids": [
+          "opentab-1",
+          "opentab-2",
+          "opentab-3",
+        ],
+        "messages": [],
+        "urls": [
+          "https://mozilla.org/learn-more-about-tp-study#opentab-1",
+          "https://mozilla.org/learn-more-about-tp-study#opentab-2",
+          "https://mozilla.org/learn-more-about-tp-study#opentab-3",
+        ],
+      }
+    },
     /** **endings**
-      * - keys indicate the 'endStudy' even that opens these.
+      * - keys indicate the 'endStudy' even   that opens these.
       * - urls should be static (data) or external, because they have to
       *   survive uninstall
       * - If there is no key for an endStudy reason, no url will open.
@@ -35,6 +68,8 @@ const config = {
     // In order to import addon libraries, use chrome.manifest and "resource://" in order
     // to get the correct file location. Then it is necessary to use
     // XPCOMUtils.defineLazyModuleGetter() to import the library.
+
+    // attribution.source attribution.medium attribution.campaign
     return true;
   },
   // addon-specific modules to load/unload during `startup`, `shutdown`
