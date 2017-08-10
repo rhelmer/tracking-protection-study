@@ -85,10 +85,12 @@ this.TrackingProtectionStudy = {
     if (this.treatment === "ALL") {
       Object.keys(this.TREATMENTS).forEach((key, index) => {
         if (Object.prototype.hasOwnProperty.call(this.TREATMENTS, key)) {
+          console.log(`rhelmer debug1 ${this.message}, ${this.url}`);
           this.TREATMENTS[key](win, this.message, this.url);
         }
       });
     } else if (this.treatment in this.TREATMENTS) {
+      console.log(`rhelmer debug2 ${this.message}, ${this.url}`);
       this.TREATMENTS[this.treatment](win, this.message, this.url);
     }
 
@@ -105,19 +107,25 @@ this.TrackingProtectionStudy = {
     }
 
     this.treatment = studyUtils.getVariation().name;
+    this.campaign_id = config.study.campaign_id;
+
     let campaigns = config.study.campaigns;
 
     // FIXME decide which URL to use based on:
     // attribution.source attribution.medium attribution.campaign
-    let campaign_id = "doorhanger-1"
     if (this.treatment in campaigns) {
       let campaign = campaigns[this.treatment];
       for (let i = 0; i < campaign.campaign_ids.length; i++) {
-        if (campaign_id === campaign.campaign_ids[i]) {
+        if (this.campaign_id === campaign.campaign_ids[i]) {
           this.message = campaign.messages[i];
           this.url = campaign.urls[i];
+          console.log(`rhelmer debug set ${this.message} ${this.url}`)
         }
       }
+    }
+
+    if (this.treatment !== "control" && !this.message && !this.url) {
+      throw `No config found for campaign ID: ${this.campaign_id} for ${this.treatment}`;
     }
 
     let win = Services.wm.getMostRecentWindow("navigator:browser");

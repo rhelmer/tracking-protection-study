@@ -5,10 +5,17 @@ const config = {
   study: {
     studyName: "tracking-protection-study", // no spaces, for all the reasons
 
-    variation: {
-      name: "doorhanger",
-    }, // optional, use to override/decide
+    // FIXME get from telemetry
+    campaign_id: "download-1",
 
+    // optional, use to override/decide
+    // Disable this for production!
+/*
+    variation: {
+      name: "opentab",
+      campaign_id: "download-1",
+    },
+*/
     weightedVariations: [
       { name: "control", weight: 1 },
       { name: "doorhanger", weight: 1 },
@@ -18,9 +25,9 @@ const config = {
     campaigns: {
       "doorhanger": {
         "campaign_ids": [
-          "doorhanger-1",
-          "doorhanger-2",
-          "doorhanger-3",
+          "download-1",
+          "download-2",
+          "download-3",
         ],
         "messages": [
           "Tracking protection is enabled, making Firefox super fast.",
@@ -35,9 +42,9 @@ const config = {
       },
       "opentab": {
         "campaign_ids": [
-          "opentab-1",
-          "opentab-2",
-          "opentab-3",
+          "download-1",
+          "download-2",
+          "download-3",
         ],
         "messages": [],
         "urls": [
