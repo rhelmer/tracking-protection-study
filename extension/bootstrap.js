@@ -11,13 +11,41 @@ XPCOMUtils.defineLazyModuleGetter(this, "config",
 
 const UI_AVAILABLE_NOTIFICATION = "sessionstore-windows-restored";
 const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
-const DOORHANGER_ID = "onboarding-trackingprotection-confirmation";
-const DOORHANGER_MESSAGE_1 = "Tracking protection is enabled, making Firefox super fast.";
-const DOORHANGER_MESSAGE_2 = "Tracking protection is enabled, blocking annoying ads.";
-const DOORHANGER_MESSAGE_3 = "Tracking protection is enabled, protecting your privacy.";
-const DOORHANGER_URL = "https://mozilla.org/learn-more-about-tp-study";
+const DOORHANGER_ID = "onboarding-trackingprotection-notification";
 const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
-const NEW_TAB_URL = "about:mozilla";
+
+const CAMPAIGNS = {
+  "doorhanger": {
+    "campaign_ids": [
+      "doorhanger-1",
+      "doorhanger-2",
+      "doorhanger-3",
+    ],
+    "messages": [
+      "Tracking protection is enabled, making Firefox super fast.",
+      "Tracking protection is enabled, blocking annoying ads.",
+      "Tracking protection is enabled, protecting your privacy.",
+    ],
+    "urls": [
+      "https://mozilla.org/learn-more-about-tp-study#doorhanger-1",
+      "https://mozilla.org/learn-more-about-tp-study#doorhanger-2",
+      "https://mozilla.org/learn-more-about-tp-study#doorhanger-3",
+    ],
+  },
+  "opentab": {
+    "campaign_ids": [
+      "opentab-1",
+      "opentab-2",
+      "opentab-3",
+    ],
+    "messages": [],
+    "urls": [
+      "https://mozilla.org/learn-more-about-tp-study#opentab-1",
+      "https://mozilla.org/learn-more-about-tp-study#opentab-2",
+      "https://mozilla.org/learn-more-about-tp-study#opentab-3",
+    ],
+  }
+}
 
 const REASONS = {
   APP_STARTUP:      1, // The application is starting up.
@@ -50,11 +78,13 @@ this.TrackingProtectionStudy = {
    * Open doorhanger-style notification on desired chrome window.
    *
    * @param {ChromeWindow} win
+   * @param {String} message
+   * @param {String} url
    */
-  openDoorhanger(win) {
+  openDoorhanger(win, message, url) {
     const options = {
       popupIconURL: DOORHANGER_ICON,
-      learnMoreURL: DOORHANGER_URL,
+      learnMoreURL: url,
       persistent: true,
       persistWhileVisible: true,
     };
@@ -65,7 +95,7 @@ this.TrackingProtectionStudy = {
       callback: () => {},
     };
 
-    win.PopupNotifications.show(win.gBrowser.selectedBrowser, DOORHANGER_ID, DOORHANGER_MESSAGE_1,
+    win.PopupNotifications.show(win.gBrowser.selectedBrowser, DOORHANGER_ID, message,
       null, action, [], options);
   },
 
@@ -73,10 +103,11 @@ this.TrackingProtectionStudy = {
    * Open URL in new tab on desired chrome window.
    *
    * @param {ChromeWindow} win
-   * @param {URL} url
+   * @param {String} message
+   * @param {String} url
    * @param {bool} foreground - true if this tab should open in the foreground.
    */
-  openURL(win, url, foreground = true) {
+  openURL(win, message, url, foreground = true) {
     const tab = win.gBrowser.addTab(url);
     if (foreground) {
       win.gBrowser.selectedTab = tab;
@@ -87,11 +118,11 @@ this.TrackingProtectionStudy = {
     if (this.treatment === "ALL") {
       Object.keys(this.TREATMENTS).forEach((key, index) => {
         if (Object.prototype.hasOwnProperty.call(this.TREATMENTS, key)) {
-          this.TREATMENTS[key](win, NEW_TAB_URL);
+          this.TREATMENTS[key](win, this.message, this.url);
         }
       });
     } else if (this.treatment in this.TREATMENTS) {
-      this.TREATMENTS[this.treatment](win, NEW_TAB_URL);
+      this.TREATMENTS[this.treatment](win, this.message, this.url);
     }
 
   },
@@ -107,6 +138,19 @@ this.TrackingProtectionStudy = {
     }
 
     this.treatment = studyUtils.getVariation().name;
+
+    // FIXME decide which URL to use based on:
+    // attribution.source attribution.medium attribution.campaign
+    let campaign_id = "doorhanger-1"
+    if (this.treatment in CAMPAIGNS) {
+      let campaign = CAMPAIGNS[this.treatment];
+      for (let i = 0; i < campaign.campaign_ids.length; i++) {
+        if (campaign_id === campaign.campaign_ids[i]) {
+          this.message = campaign.messages[i];
+          this.url = campaign.urls[i];
+        }
+      }
+    }
 
     let win = Services.wm.getMostRecentWindow("navigator:browser");
 
@@ -149,7 +193,7 @@ this.startup = async function(data, reason) {
   const variation = await chooseVariation();
   studyUtils.setVariation(variation);
 
-  // TODO Import config.modules?
+  //
 
   if (reason === REASONS.ADDON_INSTALL) {
     studyUtils.firstSeen(); // sends telemetry "enter"
