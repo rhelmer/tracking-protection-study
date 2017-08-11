@@ -1,18 +1,29 @@
 /* eslint no-unused-vars: ["error", { "varsIgnorePattern": "(config|EXPORTED_SYMBOLS)" }]*/
+const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
+XPCOMUtils.defineLazyModuleGetter(this, "AttributionCode",
+                                  "resource:///modules/AttributionCode.jsm");
+
 const EXPORTED_SYMBOLS = ["config"];
 
 const config = {
   study: {
     studyName: "tracking-protection-study", // no spaces, for all the reasons
 
-    // FIXME get from telemetry
-    campaign_id: "download-1",
+    async getCampaignId() {
+      if (this.variation) {
+        return this.variation.campaign_id;
+      }
+
+      let data = await AttributionCode.getAttrDataAsync();
+      return data.campaign;
+    },
 
     // optional, use to override/decide
     // Disable this for production!
 /*
     variation: {
-      name: "opentab",
+      name: "doorhanger",
       campaign_id: "download-1",
     },
 */
@@ -76,8 +87,17 @@ const config = {
     // to get the correct file location. Then it is necessary to use
     // XPCOMUtils.defineLazyModuleGetter() to import the library.
 
-    // attribution.source attribution.medium attribution.campaign
-    return true;
+    if (this.study.variation) {
+      return true;
+    }
+
+    let data = await AttributionCode.getAttrDataAsync();
+
+    if (data && data.campaign) {
+      return true;
+    }
+
+    return false;
   },
   // addon-specific modules to load/unload during `startup`, `shutdown`
   modules: [
