@@ -21,12 +21,12 @@ const config = {
 
     // optional, use to override/decide
     // Disable this for production!
-/*
+
     variation: {
       name: "doorhanger",
       campaign_id: "download-1",
     },
-*/
+
     weightedVariations: [
       { name: "control", weight: 1 },
       { name: "doorhanger", weight: 1 },

@@ -1,9 +1,8 @@
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/Preferences.jsm")
-Cu.import("resource://gre/modules/PopupNotifications.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "Services",
+  "resource://gre/modules/Services.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "studyUtils",
   "resource://tracking-protection-study/StudyUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "config",
@@ -82,6 +81,9 @@ this.TrackingProtectionStudy = {
   },
 
   run(win) {
+    // suppress built-in tracking protection intro.
+    win.TrackingProtection.dontShowIntroPanelAgain();
+
     if (this.treatment === "ALL") {
       Object.keys(this.TREATMENTS).forEach((key, index) => {
         if (Object.prototype.hasOwnProperty.call(this.TREATMENTS, key)) {
@@ -95,8 +97,8 @@ this.TrackingProtectionStudy = {
   },
 
   async init() {
-    const prefs = new Preferences();
-    prefs.set(TRACKING_PROTECTION_PREF, true);
+    // Enable the underlying tracking protection.
+    Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, true);
 
     // define treatments as STRING: fn(browserWindow, url)
     this.TREATMENTS = {
@@ -127,25 +129,11 @@ this.TrackingProtectionStudy = {
     }
 
     let win = Services.wm.getMostRecentWindow("navigator:browser");
-
-    if (win.gBrowser) {
-      this.run(win);
-    } else {
-      // If there is no window yet, add a listener for UI startup.
-      const observer = {
-        observe: (subject, topic, data) => {
-          Services.obs.removeObserver(observer, UI_AVAILABLE_NOTIFICATION);
-          win = Services.wm.getMostRecentWindow("navigator:browser");
-          this.run(win);
-        },
-      };
-      Services.obs.addObserver(observer, UI_AVAILABLE_NOTIFICATION);
-    }
+    this.run(win);
   },
 
   uninit() {
-    const prefs = new Preferences();
-    prefs.set(TRACKING_PROTECTION_PREF, false);
+    Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, false);
   }
 }
 
@@ -197,7 +185,7 @@ this.shutdown = this.uninstall = function(data, reason) {
   if (reason === REASONS.ADDON_UNINSTALL || reason === REASONS.ADDON_DISABLE) {
     // reset the preference in case of uninstall or disable, primarily for testing
     // purposes
-    Preferences.set("extensions.sharebuttonstudy.counter", 0);
+    Services.prefs.setBoolPref("extensions.trackingprotectionstudy.counter", 0);
     if (!studyUtils._isEnding) {
       // we are the first requestors, must be user action.
       studyUtils.endStudy({ reason: "user-disable" });
