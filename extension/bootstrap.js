@@ -8,7 +8,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "studyUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "config",
   "resource://tracking-protection-study/Config.jsm");
 
-const UI_AVAILABLE_NOTIFICATION = "sessionstore-windows-restored";
 const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
 const DOORHANGER_ID = "onboarding-trackingprotection-notification";
 const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
@@ -80,20 +79,26 @@ this.TrackingProtectionStudy = {
     }
   },
 
-  run(win) {
-    // suppress built-in tracking protection intro.
-    win.TrackingProtection.dontShowIntroPanelAgain();
-
-    if (this.treatment === "ALL") {
-      Object.keys(this.TREATMENTS).forEach((key, index) => {
-        if (Object.prototype.hasOwnProperty.call(this.TREATMENTS, key)) {
-          this.TREATMENTS[key](win, this.message, this.url);
+  attach(win) {
+    this.loadedListener = {
+      QueryInterface: XPCOMUtils.generateQI(["nsIWebProgressListener",
+        "nsISupportsWeakReference"]),
+      onStateChange(webProgress, request, stateFlags, status) {
+        if (request && request.URI) {
+          console.log(`rhelmer debug state was changed ${request.URI.spec}`);
+        } else {
+          console.log(`rhelmer debug state was changed`);
         }
-      });
-    } else if (this.treatment in this.TREATMENTS) {
-      this.TREATMENTS[this.treatment](win, this.message, this.url);
-    }
+      },
+      onSecurityChange(webProgress, request, state) {
+        let isBlocked = state & Ci.nsIWebProgressListener.STATE_BLOCKED_TRACKING_CONTENT;
+        if (isBlocked) {
+          console.log(`rhelmer debug something was blocked`);
+        }
+      }
+    };
 
+    win.gBrowser.addProgressListener(this.loadedListener);
   },
 
   async init() {
@@ -111,8 +116,6 @@ this.TrackingProtectionStudy = {
 
     let campaigns = config.study.campaigns;
 
-    // FIXME decide which URL to use based on:
-    // attribution.source attribution.medium attribution.campaign
     if (this.treatment in campaigns) {
       let campaign = campaigns[this.treatment];
       for (let i = 0; i < campaign.campaign_ids.length; i++) {
@@ -128,12 +131,67 @@ this.TrackingProtectionStudy = {
       throw `No config found for campaign ID: ${this.campaign_id} for ${this.treatment}`;
     }
 
+    // run once now on the most recent window.
     let win = Services.wm.getMostRecentWindow("navigator:browser");
-    this.run(win);
+    if (this.treatment === "ALL") {
+      Object.keys(this.TREATMENTS).forEach((key, index) => {
+        if (Object.prototype.hasOwnProperty.call(this.TREATMENTS, key)) {
+          this.TREATMENTS[key](win, this.message, this.url);
+        }
+      });
+    } else if (this.treatment in this.TREATMENTS) {
+      this.TREATMENTS[this.treatment](win, this.message, this.url);
+    }
+
+    // attach new UI to any new windows.
+    // FIXME figure out how to bind `this` properly...
+    var that = this;
+    this.windowListener = {
+      onOpenWindow: xulWindow => {
+        let win = xulWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+                           .getInterface(Ci.nsIDOMWindow);
+        win.addEventListener("load", () => {
+          if (win.gBrowser) {
+            that.attach(win);
+          } else {
+            console.log(`rhelmer debug no gBrowser in ${win}`)
+          }
+        }, {once: true});
+      },
+    }
+    Services.wm.addListener(this.windowListener);
+
+    // attach new UI to any existing windows.
+    let enumerator = Services.wm.getEnumerator("navigator:browser");
+    while (enumerator.hasMoreElements()) {
+      let win = enumerator.getNext();
+      if (win === Services.appShell.hiddenDOMWindow) {
+        continue;
+      }
+
+      // suppress built-in tracking protection intro.
+      // FIXME should this be restored on uninstall? it changes the pref that controls
+      // how many intros to show...
+      win.TrackingProtection.dontShowIntroPanelAgain();
+
+      this.attach(win);
+    }
   },
 
   uninit() {
     Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, false);
+
+    // Remove UI and listeners from all open windows.
+    Services.wm.removeListener(this.windowListener);
+    let enumerator = Services.wm.getEnumerator("navigator:browser");
+    while (enumerator.hasMoreElements()) {
+      let win = enumerator.getNext();
+      if (win === Services.appShell.hiddenDOMWindow) {
+        continue;
+      }
+      win.document.getElementById("urlbar-tracking-protection-button").remove();
+      win.gBrowser.removeProgressListener(this.loadedListener);
+    }
   }
 }
 
@@ -154,8 +212,6 @@ this.startup = async function(data, reason) {
   studyUtils.setLoggingLevel(config.log.studyUtils.level);
   const variation = await chooseVariation();
   studyUtils.setVariation(variation);
-
-  //
 
   if (reason === REASONS.ADDON_INSTALL) {
     studyUtils.firstSeen(); // sends telemetry "enter"
