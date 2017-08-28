@@ -9,6 +9,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "config",
   "resource://tracking-protection-study/Config.jsm");
 
 const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
+const TRACKING_PROTECTION_UI_PREF = "privacy.trackingprotection.ui.enabled";
 const DOORHANGER_ID = "onboarding-trackingprotection-notification";
 const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
 
@@ -104,6 +105,7 @@ this.TrackingProtectionStudy = {
   async init() {
     // Enable the underlying tracking protection.
     Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, true);
+    Services.prefs.setBoolPref(TRACKING_PROTECTION_UI_PREF, true);
 
     // define treatments as STRING: fn(browserWindow, url)
     this.TREATMENTS = {
@@ -133,6 +135,11 @@ this.TrackingProtectionStudy = {
 
     // run once now on the most recent window.
     let win = Services.wm.getMostRecentWindow("navigator:browser");
+    // suppress built-in tracking protection intro.
+    // FIXME should this be restored on uninstall? it changes the pref that controls
+      // how many intros to show...
+    win.TrackingProtection.enabledGlobally = false;
+
     if (this.treatment === "ALL") {
       Object.keys(this.TREATMENTS).forEach((key, index) => {
         if (Object.prototype.hasOwnProperty.call(this.TREATMENTS, key)) {
@@ -168,18 +175,13 @@ this.TrackingProtectionStudy = {
       if (win === Services.appShell.hiddenDOMWindow) {
         continue;
       }
-
-      // suppress built-in tracking protection intro.
-      // FIXME should this be restored on uninstall? it changes the pref that controls
-      // how many intros to show...
-      win.TrackingProtection.dontShowIntroPanelAgain();
-
       this.attach(win);
     }
   },
 
   uninit() {
     Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, false);
+    Services.prefs.setBoolPref(TRACKING_PROTECTION_UI_PREF, false);
 
     // Remove UI and listeners from all open windows.
     Services.wm.removeListener(this.windowListener);
@@ -202,15 +204,36 @@ this.shutdown = function() {
 this.install = function(data, reason) {};
 
 this.startup = async function(data, reason) {
+
   let api = await data.webExtension.startup();
   const {browser} = api;
   browser.runtime.onMessage.addListener((message, sender, sendReply) => {
-    console.log("rhelmer debug1 got msg");
-    if (message == "message-from-webextension") {
+    let win = Services.wm.getMostRecentWindow("navigator:browser");
+    let normalizedUrl = Services.io.newURI(
+      "https://" + win.gBrowser.selectedBrowser.currentURI.hostPort);
+
+    if (message == "toggle-tracking-disabled") {
+      // @see browser-trackingprotection.js
+      Services.perms.add(normalizedUrl,
+        "trackingprotection", Services.perms.ALLOW_ACTION);
+      win.gBrowser.reload();
+    } else if (message == "toggle-tracking-enabled") {
+      // @see browser-trackingprotection.js
+      Services.perms.remove(normalizedUrl, "trackingprotection");
+      win.gBrowser.reload();
+    } else if (message == "open-prefs") {
+      let url = "about:preferences#privacy";
+      // FIXME this needs to first find any already-open about:preferences tab
+      // there is probably already a function to do this somewhere in the tree...
+      const tab = win.gBrowser.addTab(url);
+      win.gBrowser.selectedTab = tab;
       sendReply({
         content: "response from legacy add-on"
       })
+    } else {
+      console.log(`Unknown message: ${message}`);
     }
+
   });
 
   studyUtils.setup({

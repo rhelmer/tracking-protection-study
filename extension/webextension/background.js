@@ -6,7 +6,8 @@ function initializePageAction(tab) {
   browser.pageAction.setIcon({tabId: tab.id, path: "icons/off.svg"});
   browser.pageAction.setTitle({tabId: tab.id, title: "Tracking Protection"});
   browser.pageAction.show(tab.id);
-  browser.pageAction.setIcon({imageData: draw(10, 0), tabId: tab.id});
+  let count = 0;
+  browser.pageAction.setIcon({imageData: draw(10, 0, count), tabId: tab.id});
 }
 
 /*
@@ -29,7 +30,7 @@ browser.tabs.onUpdated.addListener((id, changeInfo, tab) => {
 /*
 Draw pageAction icon with a text badge.
 */
-function draw(starty, startx) {
+function draw(starty, startx, count) {
   // var canvas = document.getElementById('canvas');
   let canvas = document.createElement("canvas");
   let context = canvas.getContext("2d");
@@ -42,6 +43,8 @@ function draw(starty, startx) {
   context.fillRect(startx % 19, starty % 19, 10, 10);
   context.fillStyle = "white";
   context.font = "11px Arial";
-  context.fillText("3", 0, 19);
+  if (count) {
+    context.fillText(count, 0, 19);
+  }
   return context.getImageData(0, 0, 19, 19);
 }

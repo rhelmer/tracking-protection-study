@@ -1,12 +1,10 @@
-function toggleTrackingProtection() {
-    console.log("rhelmer debug toggle tp");
-    browser.runtime.sendMessage("message-from-webextension").then(reply => {
-        if (reply) {
-            console.log("response from legacy add-on: " + reply.content);
-        }
-    });
-}
+document.addEventListener("DOMContentLoaded", event => {
 
-for (let element in document.getElementsByClassName("toggle-tp")) {
-    element.addEventListener("click", () => console.log("rhelmer debug"))
-}
+    document.getElementById("enable").onclick = () =>
+        browser.runtime.sendMessage("toggle-tracking-enabled");
+    document.getElementById("disable").onclick = () =>
+        browser.runtime.sendMessage("toggle-tracking-disabled");
+    document.getElementById("prefs").addEventListener("click", event =>
+        browser.runtime.sendMessage("open-prefs")
+    );
+});
