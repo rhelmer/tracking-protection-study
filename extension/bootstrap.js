@@ -202,6 +202,17 @@ this.shutdown = function() {
 this.install = function(data, reason) {};
 
 this.startup = async function(data, reason) {
+  let api = await data.webExtension.startup();
+  const {browser} = api;
+  browser.runtime.onMessage.addListener((message, sender, sendReply) => {
+    console.log("rhelmer debug1 got msg");
+    if (message == "message-from-webextension") {
+      sendReply({
+        content: "response from legacy add-on"
+      })
+    }
+  });
+
   studyUtils.setup({
     studyName: config.study.studyName,
     endings: config.study.endings,
