@@ -213,23 +213,24 @@ this.startup = async function(data, reason) {
       "https://" + win.gBrowser.selectedBrowser.currentURI.hostPort);
 
     if (message == "toggle-tracking-disabled") {
-      // @see browser-trackingprotection.js
-      Services.perms.add(normalizedUrl,
-        "trackingprotection", Services.perms.ALLOW_ACTION);
-      win.gBrowser.reload();
+      if (!Services.perms.testExactPermission(normalizedUrl, "trackingprotection")) {
+        // @see browser-trackingprotection.js
+        Services.perms.add(normalizedUrl,
+          "trackingprotection", Services.perms.ALLOW_ACTION);
+        win.gBrowser.reload();
+      }
     } else if (message == "toggle-tracking-enabled") {
       // @see browser-trackingprotection.js
-      Services.perms.remove(normalizedUrl, "trackingprotection");
-      win.gBrowser.reload();
+      if (Services.perms.testExactPermission(normalizedUrl, "trackingprotection")) {
+        Services.perms.remove(normalizedUrl, "trackingprotection");
+        win.gBrowser.reload();
+      }
     } else if (message == "open-prefs") {
       let url = "about:preferences#privacy";
       // FIXME this needs to first find any already-open about:preferences tab
       // there is probably already a function to do this somewhere in the tree...
       const tab = win.gBrowser.addTab(url);
       win.gBrowser.selectedTab = tab;
-      sendReply({
-        content: "response from legacy add-on"
-      })
     } else {
       console.log(`Unknown message: ${message}`);
     }

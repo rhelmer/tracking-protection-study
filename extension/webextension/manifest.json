@@ -11,7 +11,7 @@
   },
 
   "page_action": {
-    "default_icon": "icons/tracking-protection.png",
+    "default_icon": "icons/tracking-protection-enabled.png",
     "default_popup": "popup.html",
     "browser_style": true
   },

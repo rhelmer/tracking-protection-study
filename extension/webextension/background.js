@@ -3,11 +3,10 @@ Initialize the page action: set icon and title, then show.
 Only operates on tabs whose URL's protocol is applicable.
 */
 function initializePageAction(tab) {
-  browser.pageAction.setIcon({tabId: tab.id, path: "icons/off.svg"});
   browser.pageAction.setTitle({tabId: tab.id, title: "Tracking Protection"});
   browser.pageAction.show(tab.id);
-  let count = 0;
-  browser.pageAction.setIcon({imageData: draw(10, 0, count), tabId: tab.id});
+  let count = 12;
+  browser.pageAction.setIcon({imageData: draw(0, 0, count), tabId: tab.id});
 }
 
 /*
@@ -30,21 +29,19 @@ browser.tabs.onUpdated.addListener((id, changeInfo, tab) => {
 /*
 Draw pageAction icon with a text badge.
 */
-function draw(starty, startx, count) {
+function draw(starty, startx, count, enabled) {
   // var canvas = document.getElementById('canvas');
   let canvas = document.createElement("canvas");
   let context = canvas.getContext("2d");
-    let img = new Image();
-    img.src = "icons/tracking-protection-16.png"
-    img.onload = () => {
-       context.drawImage(img, 0, 2);
-  }
-  context.fillStyle = "rgba(0, 200, 0, 1)";
-  context.fillRect(startx % 19, starty % 19, 10, 10);
+  let img = new Image();
+  img.src = "icons/tracking-protection-enabled.png"
+  img.onload = () => context.drawImage(img, 0, 2);
+  context.fillStyle = "rgba(0, 150, 0, 1)";
+  context.fillRect(startx % 16, starty % 16, 16, 16);
   context.fillStyle = "white";
   context.font = "11px Arial";
   if (count) {
-    context.fillText(count, 0, 19);
+    context.fillText(count, 0, 14);
   }
-  return context.getImageData(0, 0, 19, 19);
+  return context.getImageData(0, 0, 16, 16);
 }
