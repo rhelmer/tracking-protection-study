@@ -1,0 +1,48 @@
+/* - This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this file,
+   - You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+body {
+    font: 12px Helvetica;
+
+}
+
+#main {
+    min-height: 20px;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-flow: column;
+    align-items: left;
+}
+
+#main > article {
+    margin: 4px;
+    padding: 5px;
+}
+
+#main > nav {
+    margin: 4px;
+    padding: 5px;
+}
+
+#main > aside {
+    margin: 4px;
+    padding: 5px;
+}
+
+header {
+    display: block;
+    font: 24px Helvetica;
+    margin: 4px;
+    padding: 5px;
+    text-align: left;
+}
+
+footer {
+  display: block;
+  margin: 4px;
+  padding: 5px;
+  min-height: 10px;
+  text-align: center;
+}
