@@ -81,28 +81,37 @@ this.TrackingProtectionStudy = {
   },
 
   attach(win) {
+    let that = this;
     this.loadedListener = {
       QueryInterface: XPCOMUtils.generateQI(["nsIWebProgressListener",
         "nsISupportsWeakReference"]),
-      onStateChange(webProgress, request, stateFlags, status) {
-        if (request && request.URI) {
-          console.log(`rhelmer debug state was changed ${request.URI.spec}`);
-        } else {
-          console.log(`rhelmer debug state was changed`);
-        }
-      },
       onSecurityChange(webProgress, request, state) {
+        // TODO send a message when allowed trackers are detected, too.
         let isBlocked = state & Ci.nsIWebProgressListener.STATE_BLOCKED_TRACKING_CONTENT;
         if (isBlocked) {
-          console.log(`rhelmer debug something was blocked`);
+          that.port.postMessage({
+            content: `resource blocked`
+          })
         }
+      },
+      onStateChange(webProgress, request, stateFlags, status) {
+        that.port.postMessage({
+          content: `state change`
+        })
       }
     };
 
     win.gBrowser.addProgressListener(this.loadedListener);
   },
 
-  async init() {
+  async init(api) {
+    this.api = api;
+    const {browser} = api;
+    browser.runtime.onConnect.addListener((port) => {
+      console.log("rhelmer debug listening");
+      this.port = port;
+    });
+
     // Enable the underlying tracking protection.
     Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, true);
     Services.prefs.setBoolPref(TRACKING_PROTECTION_UI_PREF, true);
@@ -191,7 +200,6 @@ this.TrackingProtectionStudy = {
       if (win === Services.appShell.hiddenDOMWindow) {
         continue;
       }
-      win.document.getElementById("urlbar-tracking-protection-button").remove();
       win.gBrowser.removeProgressListener(this.loadedListener);
     }
   }
@@ -207,6 +215,7 @@ this.startup = async function(data, reason) {
 
   let api = await data.webExtension.startup();
   const {browser} = api;
+
   browser.runtime.onMessage.addListener((message, sender, sendReply) => {
     let win = Services.wm.getMostRecentWindow("navigator:browser");
     let normalizedUrl = Services.io.newURI(
@@ -262,7 +271,7 @@ this.startup = async function(data, reason) {
   // sets experiment as active and sends installed telemetry
   await studyUtils.startup({ reason });
 
-  TrackingProtectionStudy.init();
+  TrackingProtectionStudy.init(api);
 };
 
 this.shutdown = this.uninstall = function(data, reason) {
@@ -283,7 +292,4 @@ this.shutdown = this.uninstall = function(data, reason) {
     }
   }
 
-}
-
-this.uninstall = function(data, reason) {
 }

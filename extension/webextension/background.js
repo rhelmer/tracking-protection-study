@@ -1,12 +1,23 @@
+const APPLICABLE_PROTOCOLS = ["http:", "https:"];
+
+let counter = 0;
+
+function protocolIsApplicable(url) {
+  var anchor =  document.createElement('a');
+  anchor.href = url;
+  return APPLICABLE_PROTOCOLS.includes(anchor.protocol);
+}
+
 /*
 Initialize the page action: set icon and title, then show.
 Only operates on tabs whose URL's protocol is applicable.
 */
 function initializePageAction(tab) {
-  browser.pageAction.setTitle({tabId: tab.id, title: "Tracking Protection"});
-  browser.pageAction.show(tab.id);
-  let count = 12;
-  browser.pageAction.setIcon({imageData: draw(0, 0, count), tabId: tab.id});
+  if (protocolIsApplicable(tab.url)) {
+    browser.pageAction.setTitle({tabId: tab.id, title: "Tracking Protection"});
+    browser.pageAction.show(tab.id);
+    browser.pageAction.setIcon({imageData: draw(0, 0, counter), tabId: tab.id});
+  }
 }
 
 /*
@@ -16,6 +27,19 @@ var gettingAllTabs = browser.tabs.query({});
 gettingAllTabs.then((tabs) => {
   for (let tab of tabs) {
     initializePageAction(tab);
+  }
+});
+
+let port = browser.runtime.connect({name: "connection-to-legacy"});
+
+port.onMessage.addListener(function(message) {
+  if (message) {
+    if (message.content == "resource blocked") {
+      counter++;
+      browser.pageAction.setIcon({imageData: draw(0, 0, counter), tabId: tab.id});
+    } else if (message.content == "state change") {
+      counter = 0;
+    }
   }
 });
 
@@ -29,19 +53,17 @@ browser.tabs.onUpdated.addListener((id, changeInfo, tab) => {
 /*
 Draw pageAction icon with a text badge.
 */
-function draw(starty, startx, count, enabled) {
-  // var canvas = document.getElementById('canvas');
+function draw(starty, startx, count) {
+  // let canvas = document.getElementById('canvas');
   let canvas = document.createElement("canvas");
   let context = canvas.getContext("2d");
-  let img = new Image();
-  img.src = "icons/tracking-protection-enabled.png"
-  img.onload = () => context.drawImage(img, 0, 2);
+
   context.fillStyle = "rgba(0, 150, 0, 1)";
   context.fillRect(startx % 16, starty % 16, 16, 16);
   context.fillStyle = "white";
-  context.font = "11px Arial";
+  context.font = "8px Arial";
   if (count) {
-    context.fillText(count, 0, 14);
+    context.fillText(count, 0, 16);
   }
   return context.getImageData(0, 0, 16, 16);
 }
