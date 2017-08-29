@@ -12,11 +12,23 @@ function protocolIsApplicable(url) {
 Initialize the page action: set icon and title, then show.
 Only operates on tabs whose URL's protocol is applicable.
 */
+let port = browser.runtime.connect({name: "connection-to-legacy"});
+
 function initializePageAction(tab) {
   if (protocolIsApplicable(tab.url)) {
+    port.onMessage.addListener(function(message) {
+      if (message) {
+        if (message.content == "resource blocked") {
+          counter++;
+        } else if (message.content == "state change") {
+          counter = 0;
+        }
+      }
+    });
     browser.pageAction.setTitle({tabId: tab.id, title: "Tracking Protection"});
     browser.pageAction.show(tab.id);
-    browser.pageAction.setIcon({imageData: draw(0, 0, counter), tabId: tab.id});
+    let enabled = true;
+    browser.pageAction.setIcon({imageData: draw(enabled, counter), tabId: tab.id});
   }
 }
 
@@ -30,18 +42,6 @@ gettingAllTabs.then((tabs) => {
   }
 });
 
-let port = browser.runtime.connect({name: "connection-to-legacy"});
-
-port.onMessage.addListener(function(message) {
-  if (message) {
-    if (message.content == "resource blocked") {
-      counter++;
-    } else if (message.content == "state change") {
-      counter = 0;
-    }
-  }
-});
-
 /*
 Each time a tab is updated, reset the page action for that tab.
 */
@@ -52,17 +52,21 @@ browser.tabs.onUpdated.addListener((id, changeInfo, tab) => {
 /*
 Draw pageAction icon with a text badge.
 */
-function draw(starty, startx, count) {
+function draw(enabled, counter) {
   // let canvas = document.getElementById('canvas');
   let canvas = document.createElement("canvas");
   let context = canvas.getContext("2d");
 
-  context.fillStyle = "rgba(0, 150, 0, 1)";
-  context.fillRect(startx % 16, starty % 16, 16, 16);
+  if (enabled) {
+    context.fillStyle = "rgba(0, 150, 0, 1)";
+  } else {
+    context.fillStyle = "rgba(300, 200, 0, 1)";
+  }
+  context.fillRect(0, 0, 16, 16);
   context.fillStyle = "white";
   context.font = "8px Arial";
-  if (count) {
-    context.fillText(count, 0, 16);
+  if (counter) {
+    context.fillText(counter, 0, 16);
   }
   return context.getImageData(0, 0, 16, 16);
 }
