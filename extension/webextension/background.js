@@ -36,7 +36,6 @@ port.onMessage.addListener(function(message) {
   if (message) {
     if (message.content == "resource blocked") {
       counter++;
-      browser.pageAction.setIcon({imageData: draw(0, 0, counter), tabId: tab.id});
     } else if (message.content == "state change") {
       counter = 0;
     }

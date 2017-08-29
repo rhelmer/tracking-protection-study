@@ -1,3 +1,4 @@
+
 document.addEventListener("DOMContentLoaded", event => {
     document.getElementById("enable").onclick = () =>
         browser.runtime.sendMessage("toggle-tracking-enabled");
