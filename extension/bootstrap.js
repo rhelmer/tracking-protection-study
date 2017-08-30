@@ -95,8 +95,12 @@ this.TrackingProtectionStudy = {
         }
       },
       onStateChange(webProgress, request, stateFlags, status) {
+        let normalizedUrl = Services.io.newURI(
+          "https://" + win.gBrowser.selectedBrowser.currentURI.hostPort);
+        let enabled = !Services.perms.testExactPermission(normalizedUrl, "trackingprotection");
         that.port.postMessage({
-          content: `state change`
+          content: `state change`,
+          tracking_protection_enabled: enabled
         })
       }
     };

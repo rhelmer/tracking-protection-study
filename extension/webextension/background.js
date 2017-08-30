@@ -8,26 +8,29 @@ function protocolIsApplicable(url) {
   return APPLICABLE_PROTOCOLS.includes(anchor.protocol);
 }
 
+let port = browser.runtime.connect({name: "connection-to-legacy"});
+let enabled = true;
+
+port.onMessage.addListener(function(message) {
+  if (message) {
+    if (message.content == "resource blocked") {
+      console.log(`rhelmer debug resource blocked`);
+      counter++;
+    } else if (message.content == "state change") {
+      counter = 0;
+      enabled = message.tracking_protection_enabled;
+    }
+  }
+});
+
 /*
 Initialize the page action: set icon and title, then show.
 Only operates on tabs whose URL's protocol is applicable.
 */
-let port = browser.runtime.connect({name: "connection-to-legacy"});
-
 function initializePageAction(tab) {
   if (protocolIsApplicable(tab.url)) {
-    port.onMessage.addListener(function(message) {
-      if (message) {
-        if (message.content == "resource blocked") {
-          counter++;
-        } else if (message.content == "state change") {
-          counter = 0;
-        }
-      }
-    });
     browser.pageAction.setTitle({tabId: tab.id, title: "Tracking Protection"});
     browser.pageAction.show(tab.id);
-    let enabled = true;
     browser.pageAction.setIcon({imageData: draw(enabled, counter), tabId: tab.id});
   }
 }
