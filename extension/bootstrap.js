@@ -80,34 +80,6 @@ this.TrackingProtectionStudy = {
     }
   },
 
-  attach(win) {
-    let that = this;
-    this.loadedListener = {
-      QueryInterface: XPCOMUtils.generateQI(["nsIWebProgressListener",
-        "nsISupportsWeakReference"]),
-      onSecurityChange(webProgress, request, state) {
-        // TODO send a message when allowed trackers are detected, too.
-        let isBlocked = state & Ci.nsIWebProgressListener.STATE_BLOCKED_TRACKING_CONTENT;
-        if (isBlocked) {
-          that.port.postMessage({
-            content: `resource blocked`
-          })
-        }
-      },
-      onStateChange(webProgress, request, stateFlags, status) {
-        let normalizedUrl = Services.io.newURI(
-          "https://" + win.gBrowser.selectedBrowser.currentURI.hostPort);
-        let enabled = !Services.perms.testExactPermission(normalizedUrl, "trackingprotection");
-        that.port.postMessage({
-          content: `state change`,
-          tracking_protection_enabled: enabled
-        })
-      }
-    };
-
-    win.gBrowser.addProgressListener(this.loadedListener);
-  },
-
   async init(api) {
     this.api = api;
     const {browser} = api;
@@ -117,8 +89,8 @@ this.TrackingProtectionStudy = {
     });
 
     // Enable the underlying tracking protection.
-    Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, true);
-    Services.prefs.setBoolPref(TRACKING_PROTECTION_UI_PREF, true);
+    // Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, true);
+    // Services.prefs.setBoolPref(TRACKING_PROTECTION_UI_PREF, true);
 
     // define treatments as STRING: fn(browserWindow, url)
     this.TREATMENTS = {
@@ -162,34 +134,6 @@ this.TrackingProtectionStudy = {
     } else if (this.treatment in this.TREATMENTS) {
       this.TREATMENTS[this.treatment](win, this.message, this.url);
     }
-
-    // attach new UI to any new windows.
-    // FIXME figure out how to bind `this` properly...
-    var that = this;
-    this.windowListener = {
-      onOpenWindow: xulWindow => {
-        let win = xulWindow.QueryInterface(Ci.nsIInterfaceRequestor)
-                           .getInterface(Ci.nsIDOMWindow);
-        win.addEventListener("load", () => {
-          if (win.gBrowser) {
-            that.attach(win);
-          } else {
-            console.log(`rhelmer debug no gBrowser in ${win}`)
-          }
-        }, {once: true});
-      },
-    }
-    Services.wm.addListener(this.windowListener);
-
-    // attach new UI to any existing windows.
-    let enumerator = Services.wm.getEnumerator("navigator:browser");
-    while (enumerator.hasMoreElements()) {
-      let win = enumerator.getNext();
-      if (win === Services.appShell.hiddenDOMWindow) {
-        continue;
-      }
-      this.attach(win);
-    }
   },
 
   uninit() {
@@ -222,23 +166,7 @@ this.startup = async function(data, reason) {
 
   browser.runtime.onMessage.addListener((message, sender, sendReply) => {
     let win = Services.wm.getMostRecentWindow("navigator:browser");
-    let normalizedUrl = Services.io.newURI(
-      "https://" + win.gBrowser.selectedBrowser.currentURI.hostPort);
-
-    if (message == "toggle-tracking-disabled") {
-      if (!Services.perms.testExactPermission(normalizedUrl, "trackingprotection")) {
-        // @see browser-trackingprotection.js
-        Services.perms.add(normalizedUrl,
-          "trackingprotection", Services.perms.ALLOW_ACTION);
-        win.gBrowser.reload();
-      }
-    } else if (message == "toggle-tracking-enabled") {
-      // @see browser-trackingprotection.js
-      if (Services.perms.testExactPermission(normalizedUrl, "trackingprotection")) {
-        Services.perms.remove(normalizedUrl, "trackingprotection");
-        win.gBrowser.reload();
-      }
-    } else if (message == "open-prefs") {
+    if (message == "open-prefs") {
       let url = "about:preferences#privacy";
       // FIXME this needs to first find any already-open about:preferences tab
       // there is probably already a function to do this somewhere in the tree...
@@ -247,7 +175,6 @@ this.startup = async function(data, reason) {
     } else {
       console.log(`Unknown message: ${message}`);
     }
-
   });
 
   studyUtils.setup({
