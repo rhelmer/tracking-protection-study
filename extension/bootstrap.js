@@ -24,6 +24,12 @@ const REASONS = {
   ADDON_DOWNGRADE:  8, // The add-on is being downgraded.
 };
 
+let timeSaved = 0;
+let trackersBlocked = 0;
+let websitesBlocked = 0;
+let companiesBlocked = 0;
+
+
 async function chooseVariation() {
   let variation;
   const sample = studyUtils.sample;
@@ -65,6 +71,22 @@ this.TrackingProtectionStudy = {
       null, action, [], options);
   },
 
+  onPageLoad(evt) {
+    let doc = evt.originalTarget;
+    if (doc.location.href == "about:newtab") {
+      let container = doc.getElementById("newtab-margin-top");
+      let newContainer = doc.createElement("div");
+      let minutes = timeSaved / 1000 / 60;
+
+      if (minutes >= 1) {
+        let message1 = `Firefox blocked ${trackersBlocked} trackers today`;
+        let message2 = `and saved you ${minutes.toPrecision(3)} minutes`
+        newContainer.innerHTML = message1 + "<br/>" + message2
+        container.append(newContainer);
+      }
+    }
+  },
+
   /**
    * Open URL in new tab on desired chrome window.
    *
@@ -88,9 +110,16 @@ this.TrackingProtectionStudy = {
       this.port = port;
     });
 
-    // Enable the underlying tracking protection.
-    // Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, true);
-    // Services.prefs.setBoolPref(TRACKING_PROTECTION_UI_PREF, true);
+    // Add listeners to all open windows.
+    let enumerator = Services.wm.getEnumerator("navigator:browser");
+    while (enumerator.hasMoreElements()) {
+      let win = enumerator.getNext();
+      if (win === Services.appShell.hiddenDOMWindow) {
+        continue;
+      }
+      console.log("rhelmer debug adding event listener");
+      win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad);
+    }
 
     // define treatments as STRING: fn(browserWindow, url)
     this.TREATMENTS = {
@@ -120,10 +149,6 @@ this.TrackingProtectionStudy = {
 
     // run once now on the most recent window.
     let win = Services.wm.getMostRecentWindow("navigator:browser");
-    // suppress built-in tracking protection intro.
-    // FIXME should this be restored on uninstall? it changes the pref that controls
-      // how many intros to show...
-    win.TrackingProtection.enabledGlobally = false;
 
     if (this.treatment === "ALL") {
       Object.keys(this.TREATMENTS).forEach((key, index) => {
@@ -137,18 +162,14 @@ this.TrackingProtectionStudy = {
   },
 
   uninit() {
-    Services.prefs.setBoolPref(TRACKING_PROTECTION_PREF, false);
-    Services.prefs.setBoolPref(TRACKING_PROTECTION_UI_PREF, false);
-
-    // Remove UI and listeners from all open windows.
-    Services.wm.removeListener(this.windowListener);
+    // Remove listeners from all open windows.
     let enumerator = Services.wm.getEnumerator("navigator:browser");
     while (enumerator.hasMoreElements()) {
       let win = enumerator.getNext();
       if (win === Services.appShell.hiddenDOMWindow) {
         continue;
       }
-      win.gBrowser.removeProgressListener(this.loadedListener);
+      win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
     }
   }
 }
@@ -172,6 +193,11 @@ this.startup = async function(data, reason) {
       // there is probably already a function to do this somewhere in the tree...
       const tab = win.gBrowser.addTab(url);
       win.gBrowser.selectedTab = tab;
+    } else if (message.timeSaved) {
+      timeSaved = message.timeSaved
+      trackersBlocked = message.trackersBlocked
+      websitesBlocked = message.websitesBlocked
+      companiesBlocked = message.companiesBlocked
     } else {
       console.log(`Unknown message: ${message}`);
     }
