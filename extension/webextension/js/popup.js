@@ -69,20 +69,36 @@ function setEnabledUI () {
   document.querySelector('#enabledSwitch').setAttribute('checked', true)
 }
 
-function updateFromBackgroundPage (bgPage) {
+async function updateFromBackgroundPage (bgPage) {
   disabled = bgPage.topFrameHostDisabled
+  let tab = await browser.tabs.query({
+    active: true,
+    currentWindow: true
+  })
+  let currentActiveTabID = tab[0].id
+
   if (disabled) {
+    let allowedRequests = bgPage.blockedRequests[currentActiveTabID]
+    let allowedEntities = bgPage.blockedEntities[currentActiveTabID]
+    let allowed_msg = `${allowedRequests.length} tracker(s) detected.`
+    document.querySelector("#trackers-detected").innerHTML = allowed_msg
     setDisabledUI()
   } else {
+    let blockedRequests = bgPage.blockedRequests[currentActiveTabID]
+    let blockedEntities = bgPage.blockedEntities[currentActiveTabID]
+    let blocked_msg = `${blockedRequests.length} tracker(s) blocked.`
+    document.querySelector("#trackers-detected").innerHTML = blocked_msg
     setEnabledUI()
   }
+
   let hostReport = bgPage.topFrameHostReport
   if (hostReport.hasOwnProperty('feedback')) {
     showHostReport(hostReport)
   }
 }
 
-document.querySelector('#toggle-blok').addEventListener('click', () => {
+document.querySelector('#toggle-blok').addEventListener('click', event => {
+  console.log('rhelmer debug', event.target.id)
   if (disabled) {
     browser.runtime.sendMessage('re-enable')
   } else {

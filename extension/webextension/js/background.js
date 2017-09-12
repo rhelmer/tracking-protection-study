@@ -6,14 +6,14 @@ const {log} = require('./log')
 // Set some explicit window variable for pageAction to access
 window.topFrameHostDisabled = false
 window.topFrameHostReport = {}
+window.blockedRequests = {}
+window.blockedEntities = {}
+window.allowedRequests = {}
+window.allowedEntities = {}
 
 var privateBrowsingMode = false
 var currentActiveTabID
 var currentActiveOrigin
-var blockedRequests = {}
-var blockedEntities = {}
-var allowedRequests = {}
-var allowedEntities = {}
 var totalExecTime = {}
 var mainFrameOriginDisabled = {}
 var mainFrameOriginTopHosts = {}
@@ -98,18 +98,22 @@ function blockTrackerRequests (blocklist, allowedHosts, entityList) {
     if (mainFrameOriginDisabled[requestTabID]) {
       browser.pageAction.setIcon({
         tabId: requestTabID,
-        path: {
-          '19': 'img/tracking-protection-disabled-16.png',
-          '38': 'img/tracking-protection-disabled-32.png'
-        }
+        imageData: draw(false, 0)
       })
       browser.pageAction.show(requestTabID)
-      allowedRequests[requestTabID].push(requestTopHost)
-      /*
+
+      if (hostInBlocklist(blocklist, requestTopHost)) {
+        allowedRequests[requestTabID].push(requestTopHost)
+        browser.pageAction.setIcon({
+          tabId: tabID,
+          imageData: draw(!topFrameHostDisabled, allowedRequests[requestTabID].length)
+        })
+      }
+/*
       if (allowedEntities[requestTabID].indexOf(requestEntity.entityName) === -1) {
         allowedEntities[requestTabID].push(requestEntity.entityName)
       }
-      */
+*/
       log('Allowing request from origin for which Blok is disabled.')
       return allowRequest()
     }
@@ -145,6 +149,10 @@ function blockTrackerRequests (blocklist, allowedHosts, entityList) {
       blockedRequests[requestTabID].push(requestTopHost)
       if (blockedEntities[requestTabID].indexOf(requestEntity.entityName) === -1) {
         blockedEntities[requestTabID].push(requestEntity.entityName)
+        browser.pageAction.setIcon({
+          tabId: requestTabID,
+          imageData: draw(!topFrameHostDisabled, blockedRequests[requestTabID].length)
+        })
       }
       totalExecTime[requestTabID] += Date.now() - blockTrackerRequestsStart
       browser.pageAction.show(requestTabID)
@@ -167,7 +175,7 @@ function startRequestListener (blocklist, allowedHosts, entityList) {
 function startWindowAndTabListeners (allowedHosts, reportedHosts) {
   browser.windows.onFocusChanged.addListener((windowID) => {
     browser.windows.get(windowID, {}, (focusedWindow) => {
-      if (focusedWindow.incognito) {
+      if (focusedWindow && focusedWindow.incognito) {
         privateBrowsingMode = true
       } else {
         privateBrowsingMode = false
@@ -176,6 +184,9 @@ function startWindowAndTabListeners (allowedHosts, reportedHosts) {
     log('browser.windows.onFocusChanged, windowID: ' + windowID)
     browser.tabs.query({active: true, windowId: windowID}, (tabsArray) => {
       let tab = tabsArray[0]
+      if (!tab)
+        return
+
       currentActiveTabID = tab.id
       let tabTopHost = canonicalizeHost(new URL(tab.url).host)
       mainFrameOriginDisabledIndex = allowedHosts.indexOf(tabTopHost)
@@ -230,10 +241,7 @@ function startMessageListener (allowedHosts, reportedHosts, testPilotPingChannel
       testPilotPingChannel.postMessage(testPilotPingMessage)
       browser.pageAction.setIcon({
         tabId: currentActiveTabID,
-        path: {
-          '19': 'img/tracking-protection-disabled-16.png',
-          '38': 'img/tracking-protection-disabled-32.png'
-        }
+        imageData: draw(false, 0)
       })
       allowedHosts.push(mainFrameOriginTopHost)
       browser.storage.local.set({allowedHosts: allowedHosts})
@@ -252,10 +260,7 @@ function startMessageListener (allowedHosts, reportedHosts, testPilotPingChannel
       testPilotPingChannel.postMessage(testPilotPingMessage)
       browser.pageAction.setIcon({
         tabId: currentActiveTabID,
-        path: {
-          '19': 'img/tracking-protection-16.png',
-          '38': 'img/tracking-protection-32.png'
-        }
+        imageData: draw(true, 0)
       })
       allowedHosts.splice(mainFrameOriginDisabledIndex, 1)
       browser.storage.local.set({allowedHosts: allowedHosts})
@@ -305,7 +310,8 @@ const state = {
 }
 
 function initTestPilotPingChannel ({BroadcastChannel}) {
-  let TESTPILOT_TELEMETRY_CHANNEL = 'testpilot-telemetry'
+  // let TESTPILOT_TELEMETRY_CHANNEL = 'testpilot-telemetry'
+  let TESTPILOT_TELEMETRY_CHANNEL = 'blok-telemetry'
   let testPilotPingChannel = new BroadcastChannel(TESTPILOT_TELEMETRY_CHANNEL)
   return testPilotPingChannel
 }
@@ -314,3 +320,33 @@ loadLists(state).then(() => {
   let testPilotPingChannel = initTestPilotPingChannel(window)
   startListeners(state, testPilotPingChannel)
 }, console.error.bind(console))
+
+/*
+ * Draw pageAction icon with a text badge.
+ */
+function draw(enabled, counter) {
+  let canvas = document.createElement("canvas")
+  canvas.style.width = "16px"
+  canvas.style.height = "16px"
+  canvas.height = 32
+  canvas.width = 32
+  let context = canvas.getContext("2d")
+  context.scale(2, 2)
+  let img = document.createElement("img")
+  img.src = "img/blok-8.png"
+
+  if (enabled) {
+    context.fillStyle = "rgba(0, 150, 0, 1)"
+  } else {
+    context.fillStyle = "rgba(300, 200, 0, 1)"
+  }
+
+  context.fillRect(0, 0, 32, 32)
+  context.drawImage(img, 1, 1)
+  context.fillStyle = "white"
+  context.font = "8px Arial"
+  if (counter) {
+    context.fillText(counter, 6, 14)
+  }
+  return context.getImageData(0, 0, 32, 32)
+}

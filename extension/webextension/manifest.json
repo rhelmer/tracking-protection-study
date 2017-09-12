@@ -12,7 +12,8 @@
   "applications": {
     "gecko": {
       "id": "blok@mozilla.org",
-      "strict_min_version": "55.0"
+      "strict_min_version": "48.0",
+      "update_url": "https://testpilot.firefox.com/files/blok/updates.json"
     }
   },
 
@@ -29,7 +30,7 @@
     },
     "default_title": "Tracking Protection",
     "default_popup": "html/popup.html",
-    "browser_style": false
+    "browser_style": true
   },
 
   "permissions": [
