@@ -25,9 +25,9 @@ const REASONS = {
 };
 
 let timeSaved = 0;
-let trackersBlocked = 0;
-let websitesBlocked = 0;
-let companiesBlocked = 0;
+let blockedRequests = 0;
+let blockedSites = 0;
+let blockedEntities = 0;
 
 
 async function chooseVariation() {
@@ -79,7 +79,7 @@ this.TrackingProtectionStudy = {
       let minutes = timeSaved / 1000 / 60;
 
       if (minutes >= 1) {
-        let message1 = `Firefox blocked ${trackersBlocked} trackers today`;
+        let message1 = `Firefox blocked ${blockedRequests} trackers today`;
         let message2 = `and saved you ${minutes.toPrecision(3)} minutes`
         newContainer.innerHTML = message1 + "<br/>" + message2
         container.append(newContainer);
@@ -194,10 +194,10 @@ this.startup = async function(data, reason) {
       const tab = win.gBrowser.addTab(url);
       win.gBrowser.selectedTab = tab;
     } else if (message.timeSaved) {
-      timeSaved = message.timeSaved
-      trackersBlocked = message.trackersBlocked
-      websitesBlocked = message.websitesBlocked
-      companiesBlocked = message.companiesBlocked
+      timeSaved = message.timeSaved;
+      blockedRequests = Object.values(message.blockedRequests).reduce((a, b) => b.concat(a)).length;
+      blockedSites = Object.values(message.blockedSites);
+      blockedEntities = Object.values(message.blockedEntities).reduce((a, b) => b.concat(a));
     } else {
       console.log(`Unknown message: ${message}`);
     }
