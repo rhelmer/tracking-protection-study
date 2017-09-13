@@ -24,12 +24,6 @@ const REASONS = {
   ADDON_DOWNGRADE:  8, // The add-on is being downgraded.
 };
 
-let timeSaved = 0;
-let blockedRequests = 0;
-let blockedSites = 0;
-let blockedEntities = 0;
-
-
 async function chooseVariation() {
   let variation;
   const sample = studyUtils.sample;
@@ -46,6 +40,11 @@ async function chooseVariation() {
 }
 
 this.TrackingProtectionStudy = {
+  timeSaved: 0,
+  blockedRequests: 0,
+  blockedSites: 0,
+  blockedEntities: 0,
+
   /**
    * Open doorhanger-style notification on desired chrome window.
    *
@@ -73,15 +72,19 @@ this.TrackingProtectionStudy = {
 
   onPageLoad(evt) {
     let doc = evt.originalTarget;
+    console.log(`rhelmer debug pageload ${doc}`);
     if (doc.location.href == "about:newtab") {
       let container = doc.getElementById("newtab-margin-top");
       let newContainer = doc.createElement("div");
-      let minutes = timeSaved / 1000 / 60;
+      let minutes = this.timeSaved / 1000 / 60;
 
-      if (minutes >= 1) {
-        let message1 = `Firefox blocked ${blockedRequests} trackers today`;
-        let message2 = `and saved you ${minutes.toPrecision(3)} minutes`
-        newContainer.innerHTML = message1 + "<br/>" + message2
+      if (minutes > 1) {
+        let message = this.newtab_message;
+        message = message.replace("${blockedRequests}", this.blockedRequests);
+        message = message.replace("${blockedEntities}", this.blockedEntities);
+        message = message.replace("${blockedSites}", this.blockedSites);
+        message = message.replace("${minutes}", minutes.toPrecision(3));
+        newContainer.innerHTML = message;
         container.append(newContainer);
       }
     }
@@ -105,21 +108,24 @@ this.TrackingProtectionStudy = {
   async init(api) {
     this.api = api;
     const {browser} = api;
-    browser.runtime.onConnect.addListener((port) => {
-      console.log("rhelmer debug listening");
-      this.port = port;
-    });
 
-    // Add listeners to all open windows.
-    let enumerator = Services.wm.getEnumerator("navigator:browser");
-    while (enumerator.hasMoreElements()) {
-      let win = enumerator.getNext();
-      if (win === Services.appShell.hiddenDOMWindow) {
-        continue;
+    browser.runtime.onMessage.addListener((message, sender, sendReply) => {
+      let win = Services.wm.getMostRecentWindow("navigator:browser");
+      if (message == "open-prefs") {
+        let url = "about:preferences#privacy";
+        // FIXME this needs to first find any already-open about:preferences tab
+        // there is probably already a function to do this somewhere in the tree...
+        const tab = win.gBrowser.addTab(url);
+        win.gBrowser.selectedTab = tab;
+      } else if (message.timeSaved) {
+        this.timeSaved = message.timeSaved;
+        this.blockedRequests = message.blockedRequests;
+        this.blockedSites = message.blockedSites;
+        this.blockedEntities = message.blockedEntities;
+      } else {
+        console.log(`Unknown message: ${message}`);
       }
-      console.log("rhelmer debug adding event listener");
-      win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad);
-    }
+    })
 
     // define treatments as STRING: fn(browserWindow, url)
     this.TREATMENTS = {
@@ -137,6 +143,7 @@ this.TrackingProtectionStudy = {
       for (let i = 0; i < campaign.campaign_ids.length; i++) {
         if (this.campaign_id === campaign.campaign_ids[i]) {
           this.message = campaign.messages[i];
+          this.newtab_message = campaign.newtab_messages[i];
           this.url = campaign.urls[i];
         }
       }
@@ -158,6 +165,16 @@ this.TrackingProtectionStudy = {
       });
     } else if (this.treatment in this.TREATMENTS) {
       this.TREATMENTS[this.treatment](win, this.message, this.url);
+    }
+
+    // Add listeners to all open windows.
+    let enumerator = Services.wm.getEnumerator("navigator:browser");
+    while (enumerator.hasMoreElements()) {
+      let win = enumerator.getNext();
+      if (win === Services.appShell.hiddenDOMWindow) {
+        continue;
+      }
+      win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
     }
   },
 
@@ -183,25 +200,6 @@ this.install = function(data, reason) {};
 this.startup = async function(data, reason) {
 
   let api = await data.webExtension.startup();
-  const {browser} = api;
-
-  browser.runtime.onMessage.addListener((message, sender, sendReply) => {
-    let win = Services.wm.getMostRecentWindow("navigator:browser");
-    if (message == "open-prefs") {
-      let url = "about:preferences#privacy";
-      // FIXME this needs to first find any already-open about:preferences tab
-      // there is probably already a function to do this somewhere in the tree...
-      const tab = win.gBrowser.addTab(url);
-      win.gBrowser.selectedTab = tab;
-    } else if (message.timeSaved) {
-      timeSaved = message.timeSaved;
-      blockedRequests = Object.values(message.blockedRequests).reduce((a, b) => b.concat(a)).length;
-      blockedSites = Object.values(message.blockedSites);
-      blockedEntities = Object.values(message.blockedEntities).reduce((a, b) => b.concat(a));
-    } else {
-      console.log(`Unknown message: ${message}`);
-    }
-  });
 
   studyUtils.setup({
     studyName: config.study.studyName,
@@ -234,9 +232,6 @@ this.startup = async function(data, reason) {
 this.shutdown = this.uninstall = function(data, reason) {
 
   TrackingProtectionStudy.uninit();
-
-  Cu.unload("resource://tracking-protection-study/StudyUtils.jsm");
-  Cu.unload("resource://tracking-protection-study/Config.jsm");
 
   // are we uninstalling due to user or automatic?
   if (reason === REASONS.ADDON_UNINSTALL || reason === REASONS.ADDON_DISABLE) {
