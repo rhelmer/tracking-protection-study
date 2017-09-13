@@ -160,21 +160,19 @@ function blockTrackerRequests (blocklist, allowedHosts, entityList) {
       log('Blocking request: originTopHost: ', originTopHost, ' mainFrameOriginTopHost: ', mainFrameOriginTopHosts[requestTabID], ' requestTopHost: ', requestTopHost, ' requestHostInBlocklist: ', flags.requestHostInBlocklist)
       if (requestTabID in blockedRequests) {
         blockedRequests[requestTabID].push(requestTopHost)
-      } else {
-        blockedRequests[requestTabID] = [requestTopHost]
+        totalBlockedRequests++
+        if (blockedEntities[requestTabID].indexOf(requestEntity.entityName) === -1) {
+          blockedEntities[requestTabID].push(requestEntity.entityName)
+          totalBlockedEntities++
+          browser.pageAction.setIcon({
+            tabId: requestTabID,
+            imageData: draw(!topFrameHostDisabled, blockedRequests[requestTabID].length)
+          })
+        }
+        totalExecTime[requestTabID] += Date.now() - blockTrackerRequestsStart
+        browser.pageAction.show(requestTabID)
+        return {cancel: true}
       }
-      totalBlockedRequests++
-      if (blockedEntities[requestTabID].indexOf(requestEntity.entityName) === -1) {
-        blockedEntities[requestTabID].push(requestEntity.entityName)
-        totalBlockedEntities++
-        browser.pageAction.setIcon({
-          tabId: requestTabID,
-          imageData: draw(!topFrameHostDisabled, blockedRequests[requestTabID].length)
-        })
-      }
-      totalExecTime[requestTabID] += Date.now() - blockTrackerRequestsStart
-      browser.pageAction.show(requestTabID)
-      return {cancel: true}
     }
 
     log('Default to allowing request.')
