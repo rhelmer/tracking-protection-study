@@ -81,8 +81,7 @@ this.TrackingProtectionStudy = {
     if (doc.location.href == "about:newtab") {
       let minutes = this.timeSaved / 1000 / 60;
 
-      // if (minutes >= 1 && this.blockedRequests) {
-      if (minutes && this.blockedRequests) {
+      if (minutes >= 1 && this.blockedRequests) {
         let message = this.newtab_message;
         message = message.replace("${blockedRequests}", this.blockedRequests);
         message = message.replace("${blockedEntities}", this.blockedEntities);
