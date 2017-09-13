@@ -70,6 +70,12 @@ this.TrackingProtectionStudy = {
       null, action, [], options);
   },
 
+  onOpenWindow(xulWindow) {
+    let win = xulWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+                       .getInterface(Components.interfaces.nsIDOMWindow);
+    win.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
+  },
+
   onPageLoad(evt) {
     let doc = evt.originalTarget;
     if (doc.location.href == "about:newtab") {
@@ -193,6 +199,9 @@ this.TrackingProtectionStudy = {
       }
       win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
     }
+
+    // Add listeners to any future windows.
+    Services.wm.addListener(this);
   },
 
   uninit() {
@@ -204,6 +213,7 @@ this.TrackingProtectionStudy = {
         continue;
       }
       win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
+      Services.wm.removeListener(this);
     }
   }
 }
