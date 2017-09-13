@@ -72,19 +72,36 @@ this.TrackingProtectionStudy = {
 
   onPageLoad(evt) {
     let doc = evt.originalTarget;
-    console.log(`rhelmer debug pageload ${doc}`);
     if (doc.location.href == "about:newtab") {
-      let container = doc.getElementById("newtab-margin-top");
-      let newContainer = doc.createElement("div");
       let minutes = this.timeSaved / 1000 / 60;
 
-      if (minutes > 1) {
+      // if (minutes >= 1 && this.blockedRequests) {
+      if (minutes && this.blockedRequests) {
         let message = this.newtab_message;
         message = message.replace("${blockedRequests}", this.blockedRequests);
         message = message.replace("${blockedEntities}", this.blockedEntities);
         message = message.replace("${blockedSites}", this.blockedSites);
         message = message.replace("${minutes}", minutes.toPrecision(3));
-        newContainer.innerHTML = message;
+
+        let container = doc.getElementById("newtab-margin-top");
+        let logo = doc.createElement("img");
+        logo.src = "resource://tracking-protection-study/webextension/img/blok-48.png";
+        logo.style.height = 48;
+        logo.style.width = 48;
+        logo.style.float = "left";
+        logo.style.padding = "5px";
+
+        let span = doc.createElement("span");
+        span.style.fontSize = "24px";
+        span.style.fontWeight = "lighter";
+        span.style.float = "right";
+        span.style.padding = "5px";
+        span.innerHTML = message;
+
+        let newContainer = doc.createElement("div");
+        newContainer.style.padding = "24px";
+        newContainer.append(logo);
+        newContainer.append(span);
         container.append(newContainer);
       }
     }
