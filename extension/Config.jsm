@@ -46,9 +46,9 @@ const config = {
           "Tracking protection is enabled, protecting your privacy.",
         ],
         "newtab_messages": [
-          "Firefox blocked ${blockedRequests} trackers today from ${blockedEntities} companies that track your browsing",
-          "Firefox blocked ${blockedRequests} trackers today and saved you ${minutes} minutes",
-          "Firefox blocked ${blockedRequests} ads today from ${blockedSites} different websites"
+          "Firefox blocked ${blockedRequests} trackers today</br> from ${blockedEntities} companies that track your browsing",
+          "Firefox blocked ${blockedRequests} trackers today</br> and saved you ${minutes} minutes",
+          "Firefox blocked ${blockedRequests} ads today</br> from ${blockedSites} different websites"
         ],
         "urls": [
           "https://mozilla.org/learn-more-about-tp-study#doorhanger-1",
@@ -64,9 +64,9 @@ const config = {
         ],
         "messages": [],
         "newtab_messages": [
-          "Firefox blocked ${blockedRequests} trackers today from ${blockedEntities} companies that track your browsing",
-          "Firefox blocked ${blockedRequests} trackers today and saved you ${minutes} minutes",
-          "Firefox blocked ${blockedRequests} ads today from ${blockedSites} different websites"
+          "Firefox blocked ${blockedRequests} trackers today</br> from ${blockedEntities} companies that track your browsing",
+          "Firefox blocked ${blockedRequests} trackers today</br> and saved you ${minutes} minutes",
+          "Firefox blocked ${blockedRequests} ads today</br> from ${blockedSites} different websites"
         ],
         "urls": [
           "https://mozilla.org/learn-more-about-tp-study#opentab-1",
