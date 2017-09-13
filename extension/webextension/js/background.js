@@ -158,7 +158,7 @@ function blockTrackerRequests (blocklist, allowedHosts, entityList) {
       }
 
       log('Blocking request: originTopHost: ', originTopHost, ' mainFrameOriginTopHost: ', mainFrameOriginTopHosts[requestTabID], ' requestTopHost: ', requestTopHost, ' requestHostInBlocklist: ', flags.requestHostInBlocklist)
-      blockedRequests[requestTabID].push(requestTopHost)
+      // blockedRequests[requestTabID].push(requestTopHost)
       totalBlockedRequests++
       if (blockedEntities[requestTabID].indexOf(requestEntity.entityName) === -1) {
         blockedEntities[requestTabID].push(requestEntity.entityName)
