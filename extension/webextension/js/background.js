@@ -10,6 +10,13 @@ window.blockedRequests = {}
 window.blockedEntities = {}
 window.allowedRequests = {}
 window.allowedEntities = {}
+window.sessionURICount = 0
+window.totalPageLoadTime = 0
+window.currentPageLoadTime = 0
+window.currentPageLoadStart = Date.now()
+window.totalBlockedRequests = 0
+window.totalBlockedSites = 0
+window.totalBlockedEntities = 0
 
 var privateBrowsingMode = false
 var currentActiveTabID
@@ -48,6 +55,11 @@ function isOriginDisabled (host, allowedHosts) {
 
 function blockTrackerRequests (blocklist, allowedHosts, entityList) {
   return function filterRequest (requestDetails) {
+    if (!window.topFrameHostDisabled) {
+      window.sessionURICount++
+      window.currentPageLoadStart = Date.now()
+    }
+
     var blockTrackerRequestsStart = Date.now()
     var requestTabID = requestDetails.tabId
     var originTopHost
@@ -147,8 +159,10 @@ function blockTrackerRequests (blocklist, allowedHosts, entityList) {
 
       log('Blocking request: originTopHost: ', originTopHost, ' mainFrameOriginTopHost: ', mainFrameOriginTopHosts[requestTabID], ' requestTopHost: ', requestTopHost, ' requestHostInBlocklist: ', flags.requestHostInBlocklist)
       blockedRequests[requestTabID].push(requestTopHost)
+      totalBlockedRequests++
       if (blockedEntities[requestTabID].indexOf(requestEntity.entityName) === -1) {
         blockedEntities[requestTabID].push(requestEntity.entityName)
+        totalBlockedEntities++
         browser.pageAction.setIcon({
           tabId: requestTabID,
           imageData: draw(!topFrameHostDisabled, blockedRequests[requestTabID].length)
@@ -165,10 +179,34 @@ function blockTrackerRequests (blocklist, allowedHosts, entityList) {
 }
 
 function startRequestListener (blocklist, allowedHosts, entityList) {
+  let filter = {urls: ['*://*/*']}
+
   browser.webRequest.onBeforeRequest.addListener(
     blockTrackerRequests(blocklist, allowedHosts, entityList),
-    {urls: ['*://*/*']},
+    filter,
     ['blocking']
+  )
+
+  browser.webRequest.onCompleted.addListener(
+    (requestDetails) => {
+      window.currentPageLoadTime = Date.now() - window.currentPageLoadStart
+      window.totalPageLoadTime += window.currentPageLoadTime
+      /* Since we can't time the load of blocked resources, assume that tracking protection
+         saves ~44% load time:
+         http://lifehacker.com/turn-on-tracking-protection-in-firefox-to-make-pages-lo-1706946166
+      */
+      if (window.sessionURICount && window.totalPageLoadTime) {
+        let timeSaved = (window.totalPageLoadTime / (1 - .44)) - window.totalPageLoadTime
+        let message = {
+          timeSaved: timeSaved,
+          blockedRequests: window.totalBlockedRequests,
+          blockedSites: window.totalBlockedSites,
+          blockedEntities: window.totalBlockedEntities
+        }
+        browser.runtime.sendMessage(message);
+      }
+    },
+    filter
   )
 }
 
