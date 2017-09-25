@@ -10,7 +10,6 @@
     <em:name>Tracking Protection Study</em:name>
     <em:description>Enables tracking protection, showing different copy based on where the user downloaded Firefox from.</em:description>
     <em:multiprocessCompatible>true</em:multiprocessCompatible>
-    <em:hasEmbeddedWebExtension>true</em:hasEmbeddedWebExtension>
 
     <em:targetApplication>
       <Description>

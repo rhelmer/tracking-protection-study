@@ -8,8 +8,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "studyUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "config",
   "resource://tracking-protection-study/Config.jsm");
 
-const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
-const TRACKING_PROTECTION_UI_PREF = "privacy.trackingprotection.ui.enabled";
+// TODO disable built-in tracking protection
+// const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
+// const TRACKING_PROTECTION_UI_PREF = "privacy.trackingprotection.ui.enabled";
 const DOORHANGER_ID = "onboarding-trackingprotection-notification";
 const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
 
@@ -76,8 +77,15 @@ this.TrackingProtectionStudy = {
     win.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
   },
 
+  onStateChange(win) {
+    dump(`rhelmer debug state change ${win}\n`);
+  },
+
   onPageLoad(evt) {
     let doc = evt.originalTarget;
+    // TODO only show when blocked elements
+    this.showPageAction();
+    this.setPageActionCounter("42");
     if (doc.location.href == "about:newtab") {
       let minutes = this.timeSaved / 1000 / 60;
 
@@ -91,7 +99,7 @@ this.TrackingProtectionStudy = {
 
         let container = doc.getElementById("newtab-margin-top");
         let logo = doc.createElement("img");
-        logo.src = "resource://tracking-protection-study/webextension/img/blok-48.png";
+        logo.src = "resource://tracking-protection-study/img/blok-48.png";
         logo.style.height = 48;
         logo.style.width = 48;
         logo.style.float = "left";
@@ -114,6 +122,55 @@ this.TrackingProtectionStudy = {
   },
 
   /**
+   * Shows the page action button for the current window.
+   */
+  showPageAction() {
+    let win = Services.wm.getMostRecentWindow("navigator:browser");
+    let doc = win.document;
+
+    dump("rhelmer debug", doc);
+    const ID = "tracking-protection-study";
+    if (!doc.getElementById(ID)) {
+      let toolbarButton = doc.createElement("toolbarbutton");
+      toolbarButton.id = ID;
+      toolbarButton.hidden = false;
+      toolbarButton.style.display = "-moz-box";
+      toolbarButton.style.borderRadius = "1em";
+      toolbarButton.style.backgroundColor = "green";
+      toolbarButton.style.color = "white";
+      toolbarButton.setAttribute("image", "chrome://browser/skin/tracking-protection-16.svg#enabled");
+      toolbarButton.classList.add("urlbar-icon");
+
+      let tpPanel = doc.createElement("panel");
+      tpPanel.setAttribute("id", "tracking-protection-study-panel");
+      tpPanel.setAttribute("label", "Ok!");
+      tpPanel.setAttribute("type", "arrow");
+
+      toolbarButton.append(tpPanel);
+
+      let hbox = doc.getElementById("urlbar-icons");
+      hbox.append(toolbarButton);
+    }
+  },
+
+  setPageActionCounter(counter) {
+    let win = Services.wm.getMostRecentWindow("navigator:browser");
+    let doc = win.document;
+
+    let toolbarButton = doc.getElementById("tracking-protection-study");
+    if (toolbarButton) {
+      toolbarButton.setAttribute("label", counter);
+    }
+  },
+
+  hidePageAction(doc) {
+    let toolbarButton = doc.createElement("toolbarbutton");
+    if (toolbarButton) {
+      toolbarButton.parentElement.removeChild(toolbarButton);
+    }
+  },
+
+  /**
    * Open URL in new tab on desired chrome window.
    *
    * @param {ChromeWindow} win
@@ -128,28 +185,7 @@ this.TrackingProtectionStudy = {
     }
   },
 
-  async init(api) {
-    this.api = api;
-    const {browser} = api;
-
-    browser.runtime.onMessage.addListener((message, sender, sendReply) => {
-      let win = Services.wm.getMostRecentWindow("navigator:browser");
-      if (message == "open-prefs") {
-        let url = "about:preferences#privacy";
-        // FIXME this needs to first find any already-open about:preferences tab
-        // there is probably already a function to do this somewhere in the tree...
-        const tab = win.gBrowser.addTab(url);
-        win.gBrowser.selectedTab = tab;
-      } else if (message.timeSaved) {
-        this.timeSaved = message.timeSaved;
-        this.blockedRequests = message.blockedRequests;
-        this.blockedSites = message.blockedSites;
-        this.blockedEntities = message.blockedEntities;
-      } else {
-        console.log(`Unknown message: ${message}`);
-      }
-    })
-
+  async init() {
     // define treatments as STRING: fn(browserWindow, url)
     this.TREATMENTS = {
       doorhanger: this.openDoorhanger,
@@ -197,8 +233,10 @@ this.TrackingProtectionStudy = {
       if (win === Services.appShell.hiddenDOMWindow) {
         continue;
       }
-      win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
     }
+
+    win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
+    win.gBrowser.addProgressListener(this);
 
     // Add listeners to any future windows.
     Services.wm.addListener(this);
@@ -212,7 +250,14 @@ this.TrackingProtectionStudy = {
       if (win === Services.appShell.hiddenDOMWindow) {
         continue;
       }
+
+      let button = win.document.getElementById("tracking-protection-study")
+      if (button) {
+        button.parentElement.removeChild(button);
+      }
+
       win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
+      win.gBrowser.removeProgressListener(this);
       Services.wm.removeListener(this);
     }
   }
@@ -227,8 +272,6 @@ this.shutdown = function() {
 this.install = function(data, reason) {};
 
 this.startup = async function(data, reason) {
-
-  let api = await data.webExtension.startup();
 
   studyUtils.setup({
     studyName: config.study.studyName,
@@ -255,7 +298,7 @@ this.startup = async function(data, reason) {
   // sets experiment as active and sends installed telemetry
   await studyUtils.startup({ reason });
 
-  TrackingProtectionStudy.init(api);
+  TrackingProtectionStudy.init();
 };
 
 this.shutdown = this.uninstall = function(data, reason) {
