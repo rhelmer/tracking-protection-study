@@ -7,6 +7,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "studyUtils",
   "resource://tracking-protection-study/StudyUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "config",
   "resource://tracking-protection-study/Config.jsm");
+XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
+  "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");
 
 // TODO disable built-in tracking protection
 // const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
@@ -77,10 +79,6 @@ this.TrackingProtectionStudy = {
     win.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
   },
 
-  onStateChange(win) {
-    dump(`rhelmer debug state change ${win}\n`);
-  },
-
   onPageLoad(evt) {
     let doc = evt.originalTarget;
     // TODO only show when blocked elements
@@ -125,31 +123,43 @@ this.TrackingProtectionStudy = {
    * Shows the page action button for the current window.
    */
   showPageAction() {
+    let url = "resource://tracking-protection-study/tracking-protection-study.css";
+    let uri = Services.io.newURI(url);
+    styleSheetService.loadAndRegisterSheet(uri, styleSheetService.AGENT_SHEET);
+
     let win = Services.wm.getMostRecentWindow("navigator:browser");
     let doc = win.document;
 
-    dump("rhelmer debug", doc);
-    const ID = "tracking-protection-study";
-    if (!doc.getElementById(ID)) {
-      let toolbarButton = doc.createElement("toolbarbutton");
-      toolbarButton.id = ID;
-      toolbarButton.hidden = false;
-      toolbarButton.style.display = "-moz-box";
-      toolbarButton.style.borderRadius = "1em";
-      toolbarButton.style.backgroundColor = "green";
-      toolbarButton.style.color = "white";
-      toolbarButton.setAttribute("image", "chrome://browser/skin/tracking-protection-16.svg#enabled");
-      toolbarButton.classList.add("urlbar-icon");
+    if (!doc.getElementById("tracking-protection-study-button")) {
+      let urlbar = doc.getElementById("urlbar-icons");
 
-      let tpPanel = doc.createElement("panel");
-      tpPanel.setAttribute("id", "tracking-protection-study-panel");
-      tpPanel.setAttribute("label", "Ok!");
-      tpPanel.setAttribute("type", "arrow");
+      let panel = doc.createElement("panel");
+      panel.setAttribute("id", "tracking-protection-study-panel");
+      panel.setAttribute("type", "arrow");
+      panel.setAttribute("level", "parent");
+      let panelHbox = doc.createElement("hbox");
+      let group = doc.createElement("radiogroup");
+      let radio1 = doc.createElement("radio");
+      radio1.setAttribute("label", "Enable Tracking Protection");
+      let radio2 = doc.createElement("radio");
+      radio2.setAttribute("label", "Disable Tracking Protection");
+      group.append(radio1);
+      group.append(radio2);
+      panelHbox.append(group);
+      panel.append(panelHbox);
 
-      toolbarButton.append(tpPanel);
+      let button = doc.createElement("toolbarbutton");
+      button.style.backgroundColor = "green";
+      button.setAttribute("id", "tracking-protection-study-button");
+      button.setAttribute("label", "3.1s");
+      button.setAttribute("image", "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled");
+      button.append(panel);
+      button.addEventListener("command", event => {
+        win.document.getElementById("panel");
+        panel.openPopup(button);
+      });
 
-      let hbox = doc.getElementById("urlbar-icons");
-      hbox.append(toolbarButton);
+      urlbar.append(button);
     }
   },
 
@@ -164,10 +174,16 @@ this.TrackingProtectionStudy = {
   },
 
   hidePageAction(doc) {
-    let toolbarButton = doc.createElement("toolbarbutton");
-    if (toolbarButton) {
-      toolbarButton.parentElement.removeChild(toolbarButton);
+    if (!doc) {
+      let win = Services.wm.getMostRecentWindow("navigator:browser");
+      doc = win.document;
     }
+    let button = doc.getElementById("tracking-protection-study-button");
+    button.parentElement.removeChild(button);
+
+    let url = "chrome://tracking-protection-study/content/tracking-protection-study.css";
+    let uri = Services.io.newURI(url);
+    styleSheetService.unregisterSheet(uri, styleSheetService.AGENT_SHEET);
   },
 
   /**
@@ -236,9 +252,6 @@ this.TrackingProtectionStudy = {
     }
 
     win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
-    win.gBrowser.addProgressListener(this);
-
-    // Add listeners to any future windows.
     Services.wm.addListener(this);
   },
 
@@ -257,7 +270,6 @@ this.TrackingProtectionStudy = {
       }
 
       win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
-      win.gBrowser.removeProgressListener(this);
       Services.wm.removeListener(this);
     }
   }

@@ -1,0 +1,16 @@
+#tracking-protection-study-button {
+  font-size: .8em;
+  padding: 0 8px;
+  border-radius: .9em;
+  border: 1px solid ThreeDLightShadow;
+}
+
+#tracking-protection-study-button > .toolbarbutton-text {
+  display: -moz-box;
+  color: white;
+}
+
+#tracking-protection-study-button > image {
+  height: 16px;
+  width: 16px;
+}
