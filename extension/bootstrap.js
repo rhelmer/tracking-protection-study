@@ -128,10 +128,15 @@ this.TrackingProtectionStudy = {
 
   onBeforeRequest(details) {
     let result;
-    if (details && details.url) {
+    if (details && details.originUrl) {
+      let browser = details.browser;
       let win = Services.wm.getMostRecentWindow("navigator:browser");
-      let currentHost = win.getBrowser().currentURI.host;
-      let host = new URL(details.url).host;
+      let currentURI = browser.currentURI;
+      if (!currentURI) {
+        return;
+      }
+      let currentHost = currentURI.host;
+      let host = new URL(details.originUrl).host;
 
       if (currentHost != host && blocklists.hostInBlocklist(this.state.blocklist, host)) {
         console.log(`Tracking Protection study has blocked a request to: ${host}`);
@@ -143,25 +148,19 @@ this.TrackingProtectionStudy = {
           counter = 1;
         }
         this.state.blockedResources.set(currentHost, counter);
-        this.showPageAction();
+        this.showPageAction(browser);
         this.setPageActionCounter(counter);
 
-        result = {cancel: true};
+        return {cancel: true};
       }
     }
-    return result;
   },
 
   /**
    * Shows the page action button for the current window.
    */
-  showPageAction() {
-    let url = "resource://tracking-protection-study/tracking-protection-study.css";
-    let uri = Services.io.newURI(url);
-    styleSheetService.loadAndRegisterSheet(uri, styleSheetService.AGENT_SHEET);
-
-    let win = Services.wm.getMostRecentWindow("navigator:browser");
-    let doc = win.document;
+  showPageAction(browser) {
+    let doc = browser.getRootNode();
 
     if (!doc.getElementById("tracking-protection-study-button")) {
       let urlbar = doc.getElementById("urlbar-icons");
@@ -184,11 +183,10 @@ this.TrackingProtectionStudy = {
       let button = doc.createElement("toolbarbutton");
       button.style.backgroundColor = "green";
       button.setAttribute("id", "tracking-protection-study-button");
-//      button.setAttribute("label", "3.1s");
       button.setAttribute("image", "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled");
       button.append(panel);
       button.addEventListener("command", event => {
-        win.document.getElementById("panel");
+        doc.getElementById("panel");
         panel.openPopup(button);
       });
 
@@ -212,11 +210,13 @@ this.TrackingProtectionStudy = {
       doc = win.document;
     }
     let button = doc.getElementById("tracking-protection-study-button");
-    button.parentElement.removeChild(button);
+    if (button) {
+      button.parentElement.removeChild(button);
+    }
+  },
 
-    let url = "chrome://tracking-protection-study/content/tracking-protection-study.css";
-    let uri = Services.io.newURI(url);
-    styleSheetService.unregisterSheet(uri, styleSheetService.AGENT_SHEET);
+  reset() {
+    this.hidePageAction();
   },
 
   /**
@@ -287,7 +287,13 @@ this.TrackingProtectionStudy = {
     let filter = {urls: new MatchPattern("*://*/*")};
     WebRequest.onBeforeRequest.addListener(this.onBeforeRequest.bind(this), filter, ["blocking"]);
 
+    let url = "resource://tracking-protection-study/tracking-protection-study.css";
+    let uri = Services.io.newURI(url);
+    styleSheetService.loadAndRegisterSheet(uri, styleSheetService.AGENT_SHEET);
+
     win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
+    win.gBrowser.addEventListener("TabSelect", this.reset());
+    win.gBrowser.addEventListener("pageshow", this.reset());
     Services.wm.addListener(this);
   },
 
@@ -305,10 +311,14 @@ this.TrackingProtectionStudy = {
         button.parentElement.removeChild(button);
       }
 
-      WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
+      WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest.bind(this));
       win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
       Services.wm.removeListener(this);
     }
+
+    let url = "chrome://tracking-protection-study/content/tracking-protection-study.css";
+    let uri = Services.io.newURI(url);
+    styleSheetService.unregisterSheet(uri, styleSheetService.AGENT_SHEET);
   }
 }
 
