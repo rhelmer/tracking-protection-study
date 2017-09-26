@@ -1,12 +1,16 @@
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "config",
+  "resource://tracking-protection-study/Config.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Services",
   "resource://gre/modules/Services.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "studyUtils",
   "resource://tracking-protection-study/StudyUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "config",
-  "resource://tracking-protection-study/Config.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "WebRequest",
+  "resource://gre/modules/WebRequest.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "MatchPattern",
+  "resource://gre/modules/MatchPattern.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
   "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");
 
@@ -117,6 +121,11 @@ this.TrackingProtectionStudy = {
         container.append(newContainer);
       }
     }
+  },
+
+  onBeforeRequest(details) {
+    console.log(`Tracking Protection study has blocked the URL: ${details.url}`);
+    return {cancel: true};
   },
 
   /**
@@ -242,14 +251,8 @@ this.TrackingProtectionStudy = {
       this.TREATMENTS[this.treatment](win, this.message, this.url);
     }
 
-    // Add listeners to all open windows.
-    let enumerator = Services.wm.getEnumerator("navigator:browser");
-    while (enumerator.hasMoreElements()) {
-      let win = enumerator.getNext();
-      if (win === Services.appShell.hiddenDOMWindow) {
-        continue;
-      }
-    }
+    let filter = {urls: new MatchPattern("*://reddit.com/*")};
+    WebRequest.onBeforeRequest.addListener(this.onBeforeRequest, filter, ["blocking"]);
 
     win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
     Services.wm.addListener(this);
@@ -269,6 +272,7 @@ this.TrackingProtectionStudy = {
         button.parentElement.removeChild(button);
       }
 
+      WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
       win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
       Services.wm.removeListener(this);
     }
