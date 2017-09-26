@@ -1,6 +1,8 @@
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "blocklists",
+  "resource://tracking-protection-study/BlockLists.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "config",
   "resource://tracking-protection-study/Config.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Services",
@@ -11,8 +13,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "WebRequest",
   "resource://gre/modules/WebRequest.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "MatchPattern",
   "resource://gre/modules/MatchPattern.jsm");
+
 XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
   "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");
+
+Cu.importGlobalProperties(["URL"]);
 
 // TODO disable built-in tracking protection
 // const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
@@ -85,9 +90,7 @@ this.TrackingProtectionStudy = {
 
   onPageLoad(evt) {
     let doc = evt.originalTarget;
-    // TODO only show when blocked elements
-    this.showPageAction();
-    this.setPageActionCounter("42");
+    this.hidePageAction(doc);
     if (doc.location.href == "about:newtab") {
       let minutes = this.timeSaved / 1000 / 60;
 
@@ -124,8 +127,29 @@ this.TrackingProtectionStudy = {
   },
 
   onBeforeRequest(details) {
-    console.log(`Tracking Protection study has blocked the URL: ${details.url}`);
-    return {cancel: true};
+    let result;
+    if (details && details.url) {
+      let win = Services.wm.getMostRecentWindow("navigator:browser");
+      let currentHost = win.getBrowser().currentURI.host;
+      let host = new URL(details.url).host;
+
+      if (currentHost != host && blocklists.hostInBlocklist(this.state.blocklist, host)) {
+        console.log(`Tracking Protection study has blocked a request to: ${host}`);
+        let counter;
+        if (this.state.blockedResources.has(currentHost)) {
+          counter = this.state.blockedResources.get(currentHost);
+          counter++;
+        } else {
+          counter = 1;
+        }
+        this.state.blockedResources.set(currentHost, counter);
+        this.showPageAction();
+        this.setPageActionCounter(counter);
+
+        result = {cancel: true};
+      }
+    }
+    return result;
   },
 
   /**
@@ -160,7 +184,7 @@ this.TrackingProtectionStudy = {
       let button = doc.createElement("toolbarbutton");
       button.style.backgroundColor = "green";
       button.setAttribute("id", "tracking-protection-study-button");
-      button.setAttribute("label", "3.1s");
+//      button.setAttribute("label", "3.1s");
       button.setAttribute("image", "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled");
       button.append(panel);
       button.addEventListener("command", event => {
@@ -176,7 +200,7 @@ this.TrackingProtectionStudy = {
     let win = Services.wm.getMostRecentWindow("navigator:browser");
     let doc = win.document;
 
-    let toolbarButton = doc.getElementById("tracking-protection-study");
+    let toolbarButton = doc.getElementById("tracking-protection-study-button");
     if (toolbarButton) {
       toolbarButton.setAttribute("label", counter);
     }
@@ -251,8 +275,17 @@ this.TrackingProtectionStudy = {
       this.TREATMENTS[this.treatment](win, this.message, this.url);
     }
 
-    let filter = {urls: new MatchPattern("*://reddit.com/*")};
-    WebRequest.onBeforeRequest.addListener(this.onBeforeRequest, filter, ["blocking"]);
+    this.state = {
+      blocklist: new Map(),
+      allowedHosts: [],
+      reportedHosts: {},
+      entityList: {},
+      blockedResources: new Map()
+    }
+    await blocklists.loadLists(this.state);
+
+    let filter = {urls: new MatchPattern("*://*/*")};
+    WebRequest.onBeforeRequest.addListener(this.onBeforeRequest.bind(this), filter, ["blocking"]);
 
     win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
     Services.wm.addListener(this);
