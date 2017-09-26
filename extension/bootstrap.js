@@ -84,13 +84,19 @@ this.TrackingProtectionStudy = {
 
   onOpenWindow(xulWindow) {
     let win = xulWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                       .getInterface(Components.interfaces.nsIDOMWindow);
-    win.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
+                       .getInterface(Components.interfaces.nsIDOMWindow)
+
+    let gBrowser = win;
+    this.addEventListeners(gBrowser);
   },
 
-  onPageLoad(evt) {
+  onPageLoad: (evt) => {
     let doc = evt.originalTarget;
     this.hidePageAction(doc);
+
+    let currentHost = new URL(doc.location.href).host;
+    this.state.blockedResources.set(currentHost, 0);
+
     if (doc.location.href == "about:newtab") {
       let minutes = this.timeSaved / 1000 / 60;
 
@@ -128,9 +134,8 @@ this.TrackingProtectionStudy = {
 
   onBeforeRequest(details) {
     let result;
-    if (details && details.originUrl) {
+    if (details && details.url && details.browser) {
       let browser = details.browser;
-      let win = Services.wm.getMostRecentWindow("navigator:browser");
       let currentURI = browser.currentURI;
       if (!currentURI) {
         return;
@@ -148,20 +153,18 @@ this.TrackingProtectionStudy = {
           counter = 1;
         }
         this.state.blockedResources.set(currentHost, counter);
-        this.showPageAction(browser);
-        this.setPageActionCounter(counter);
-
-        return {cancel: true};
+        this.showPageAction(browser.getRootNode());
+        this.setPageActionCounter(browser.getRootNode(), counter);
+        result = {cancel: true};
       }
     }
+    return result;
   },
 
   /**
    * Shows the page action button for the current window.
    */
-  showPageAction(browser) {
-    let doc = browser.getRootNode();
-
+  showPageAction(doc) {
     if (!doc.getElementById("tracking-protection-study-button")) {
       let urlbar = doc.getElementById("urlbar-icons");
 
@@ -194,10 +197,7 @@ this.TrackingProtectionStudy = {
     }
   },
 
-  setPageActionCounter(counter) {
-    let win = Services.wm.getMostRecentWindow("navigator:browser");
-    let doc = win.document;
-
+  setPageActionCounter(doc, counter) {
     let toolbarButton = doc.getElementById("tracking-protection-study-button");
     if (toolbarButton) {
       toolbarButton.setAttribute("label", counter);
@@ -205,18 +205,28 @@ this.TrackingProtectionStudy = {
   },
 
   hidePageAction(doc) {
-    if (!doc) {
-      let win = Services.wm.getMostRecentWindow("navigator:browser");
-      doc = win.document;
-    }
     let button = doc.getElementById("tracking-protection-study-button");
     if (button) {
       button.parentElement.removeChild(button);
     }
   },
 
-  reset() {
-    this.hidePageAction();
+  onTabChange(evt) {
+    let win = evt.target.ownerGlobal;
+    let currentURI = win.gBrowser.currentURI;
+    if (currentURI.scheme != "http" && currentURI.scheme != "https") {
+      this.hidePageAction(win.document);
+      return;
+    }
+    let currentHost = win.gBrowser.currentURI.host;
+
+    this.hidePageAction(win.document);
+    let counter = this.state.blockedResources.get(currentHost);
+
+    if (counter) {
+      this.showPageAction(win.document);
+      this.setPageActionCounter(win.document, counter);
+    }
   },
 
   /**
@@ -285,16 +295,37 @@ this.TrackingProtectionStudy = {
     await blocklists.loadLists(this.state);
 
     let filter = {urls: new MatchPattern("*://*/*")};
-    WebRequest.onBeforeRequest.addListener(this.onBeforeRequest.bind(this), filter, ["blocking"]);
+    this.onBeforeRequest = this.onBeforeRequest.bind(this);
+
+    WebRequest.onBeforeRequest.addListener(this.onBeforeRequest, filter, ["blocking"]);
 
     let url = "resource://tracking-protection-study/tracking-protection-study.css";
     let uri = Services.io.newURI(url);
     styleSheetService.loadAndRegisterSheet(uri, styleSheetService.AGENT_SHEET);
 
-    win.gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad.bind(this));
-    win.gBrowser.addEventListener("TabSelect", this.reset());
-    win.gBrowser.addEventListener("pageshow", this.reset());
+    // Add listeners to all open windows.
+    let enumerator = Services.wm.getEnumerator("navigator:browser");
+    while (enumerator.hasMoreElements()) {
+      let win = enumerator.getNext();
+      if (win === Services.appShell.hiddenDOMWindow) {
+        continue;
+      }
+
+      let gBrowser = win.gBrowser;
+      this.addEventListeners(gBrowser);
+    }
+
+    // Attach to any new windows.
     Services.wm.addListener(this);
+  },
+
+  addEventListeners(gBrowser) {
+    this.onPageLoad = this.onPageLoad.bind(this);
+    this.onTabChange = this.onTabChange.bind(this);
+
+    gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad);
+    gBrowser.tabContainer.addEventListener("TabSelect", this.onTabChange);
+    gBrowser.tabContainer.addEventListener("pageshow", this.onTabChange);
   },
 
   uninit() {
@@ -311,14 +342,17 @@ this.TrackingProtectionStudy = {
         button.parentElement.removeChild(button);
       }
 
-      WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest.bind(this));
+      WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
       win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
+      win.gBrowser.tabContainer.removeEventListener("TabSelect", this.onTabChange);
+      win.gBrowser.tabContainer.removeEventListener("pageshow", this.onTabChange);
+
       Services.wm.removeListener(this);
     }
 
     let url = "chrome://tracking-protection-study/content/tracking-protection-study.css";
     let uri = Services.io.newURI(url);
-    styleSheetService.unregisterSheet(uri, styleSheetService.AGENT_SHEET);
+    styleSheetService.unregisterSheet(uri);
   }
 }
 
