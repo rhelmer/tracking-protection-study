@@ -90,12 +90,12 @@ this.TrackingProtectionStudy = {
     this.addEventListeners(gBrowser);
   },
 
-  onPageLoad: (evt) => {
-    let doc = evt.originalTarget;
+  onLocationChange(browser, progress, request, uri) {
+    let doc = browser.getRootNode();
     this.hidePageAction(doc);
     this.setPageActionCounter(doc, 0);
 
-    let currentHost = new URL(doc.location.href).host;
+    let currentHost = new URL(browser._documentURI.spec).host;
     this.state.blockedResources.set(currentHost, 0);
 
     if (doc.location.href == "about:newtab") {
@@ -103,7 +103,7 @@ this.TrackingProtectionStudy = {
 
       // FIXME commented out for testing
       // if (minutes >= 1 && this.blockedRequests) {
-      if (minutes && this.blockedRequests) {
+      if (minutes && this.state.totalBlockedResources) {
         let message = this.newtab_message;
         message = message.replace("${blockedRequests}", this.blockedRequests);
         message = message.replace("${blockedEntities}", this.blockedEntities);
@@ -155,6 +155,7 @@ this.TrackingProtectionStudy = {
           counter = 1;
         }
         this.state.blockedResources.set(currentHost, counter);
+        this.state.totalBlockedResources += counter;
         this.showPageAction(browser.getRootNode());
         this.setPageActionCounter(browser.getRootNode(), counter);
         result = {cancel: true};
@@ -307,7 +308,8 @@ this.TrackingProtectionStudy = {
       allowedHosts: [],
       reportedHosts: {},
       entityList: {},
-      blockedResources: new Map()
+      blockedResources: new Map(),
+      totalBlockedResources: 0
     }
     await blocklists.loadLists(this.state);
 
@@ -337,13 +339,10 @@ this.TrackingProtectionStudy = {
   },
 
   addEventListeners(gBrowser) {
-    this.onPageLoad = this.onPageLoad.bind(this);
     this.onTabChange = this.onTabChange.bind(this);
 
-    gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad);
+    gBrowser.addTabsProgressListener(this);
     gBrowser.tabContainer.addEventListener("TabSelect", this.onTabChange);
-    gBrowser.tabContainer.addEventListener("pageshow", this.onPageLoad);
-    gBrowser.tabContainer.addEventListener("loadstart", this.onPageLoad);
   },
 
   uninit() {
@@ -361,10 +360,8 @@ this.TrackingProtectionStudy = {
       }
 
       WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
-      win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
+      win.gBrowser.removeTabsProgressListener(this);
       win.gBrowser.tabContainer.removeEventListener("TabSelect", this.onTabChange);
-      win.gBrowser.tabContainer.removeEventListener("pageshow", this.onPageLoad);
-      win.gBrowser.tabContainer.removeEventListener("loadstart", this.onPageLoad);
 
       Services.wm.removeListener(this);
     }
