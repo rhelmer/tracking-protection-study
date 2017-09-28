@@ -158,10 +158,16 @@ this.TrackingProtectionStudy = {
         } else {
           counter = 1;
         }
+
         this.state.blockedResources.set(currentHost, counter);
         this.state.totalBlockedResources += counter;
-        this.showPageAction(browser.getRootNode());
-        this.setPageActionCounter(browser.getRootNode(), counter);
+
+        let win = Services.wm.getMostRecentWindow("navigator:browser");
+        if (currentHost == win.gBrowser.currentURI.host) {
+          this.showPageAction(browser.getRootNode());
+          this.setPageActionCounter(browser.getRootNode(), counter);
+        }
+
         result = {cancel: true};
       }
     }
@@ -187,18 +193,18 @@ this.TrackingProtectionStudy = {
       let enabled = doc.createElement("radio");
       enabled.setAttribute("label", "Enable Tracking Protection");
       enabled.addEventListener("click", () => {
-        if (this.state.allowedHosts.includes(currentHost)) {
-          delete this.state.allowedHosts[currentHost];
+        if (this.state.allowedHosts.has(currentHost)) {
+          this.state.allowedHosts.delete(currentHost);
         }
         win.gBrowser.reload();
       });
       let disabled = doc.createElement("radio");
       disabled.setAttribute("label", "Disable Tracking Protection");
       disabled.addEventListener("click", () => {
-        this.state.allowedHosts.push(currentHost);
+        this.state.allowedHosts.add(currentHost);
         win.gBrowser.reload();
       });
-      if (this.state.allowedHosts.includes(currentHost)) {
+      if (this.state.allowedHosts.has(currentHost)) {
         disabled.setAttribute("selected", true);
       } else {
         enabled.setAttribute("selected", true);
@@ -209,7 +215,7 @@ this.TrackingProtectionStudy = {
       panel.append(panelHbox);
 
       let button = doc.createElement("toolbarbutton");
-      if (this.state.allowedHosts.includes(currentHost)) {
+      if (this.state.allowedHosts.has(currentHost)) {
         button.style.backgroundColor = "yellow";
       } else {
         button.style.backgroundColor = "green";
@@ -247,14 +253,17 @@ this.TrackingProtectionStudy = {
       this.hidePageAction(win.document);
       return;
     }
-    let currentHost = win.gBrowser.currentURI.host;
+    let currentWin = Services.wm.getMostRecentWindow("navigator:browser");
 
-    this.hidePageAction(win.document);
-    let counter = this.state.blockedResources.get(currentHost);
+    if (win == currentWin) {
+      this.hidePageAction(win.document);
+      let currentHost = win.gBrowser.currentURI.host;
+      let counter = this.state.blockedResources.get(currentHost);
 
-    if (counter) {
-      this.showPageAction(win.document);
-      this.setPageActionCounter(win.document, counter);
+      if (counter) {
+        this.showPageAction(win.document);
+        this.setPageActionCounter(win.document, counter);
+      }
     }
   },
 
@@ -316,12 +325,13 @@ this.TrackingProtectionStudy = {
 
     this.state = {
       blocklist: new Map(),
-      allowedHosts: [],
+      allowedHosts: new Set(),
       reportedHosts: {},
       entityList: {},
       blockedResources: new Map(),
       totalBlockedResources: 0
     }
+
     await blocklists.loadLists(this.state);
 
     let filter = {urls: new MatchPattern("*://*/*")};
@@ -387,6 +397,7 @@ this.shutdown = function() {
   TrackingProtectionStudy.uninit();
   Cu.unload("resource://tracking-protection-study/StudyUtils.jsm");
   Cu.unload("resource://tracking-protection-study/Config.jsm");
+  Cu.unload("resource://tracking-protection-study/Blocklists.jsm");
 };
 
 this.install = function(data, reason) {};

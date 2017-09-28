@@ -23,15 +23,16 @@ const blocklists = {
       state.entityList = data
     })
 
-    const allowedHostsPromise = this.getAllowedHostsList().then((allowedHosts) => {
-      state.allowedHosts = allowedHosts
-    })
+//    const allowedHostsPromise = this.getAllowedHostsList().then((allowedHosts) => {
+//      state.allowedHosts = allowedHosts
+//    })
 
     const reportedHostsPromise = this.getReportedHostsList().then((reportedHosts) => {
       state.reportedHosts = reportedHosts
     })
 
-    return Promise.all([blockListPromise, entityListPromise, allowedHostsPromise, reportedHostsPromise])
+    // return Promise.all([blockListPromise, entityListPromise, allowedHostsPromise, reportedHostsPromise])
+    return Promise.all([blockListPromise, entityListPromise, reportedHostsPromise])
   },
 
   loadJSON(url) {
