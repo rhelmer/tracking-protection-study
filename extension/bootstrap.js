@@ -178,8 +178,23 @@ this.TrackingProtectionStudy = {
       let group = doc.createElement("radiogroup");
       let radio1 = doc.createElement("radio");
       radio1.setAttribute("label", "Enable Tracking Protection");
+      radio1.addEventListener("click", () => {
+        let button = doc.getElementById("tracking-protection-study-button");
+        button.style.backgroundColor = "green";
+        let filter = {urls: new MatchPattern("*://*/*")};
+        WebRequest.onBeforeRequest.addListener(this.onBeforeRequest, filter, ["blocking"]);
+        let win = Services.wm.getMostRecentWindow("navigator:browser");
+        win.gBrowser.reload();
+      });
       let radio2 = doc.createElement("radio");
       radio2.setAttribute("label", "Disable Tracking Protection");
+      radio2.addEventListener("click", () => {
+        let button = doc.getElementById("tracking-protection-study-button");
+        button.style.backgroundColor = "yellow";
+        WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
+        let win = Services.wm.getMostRecentWindow("navigator:browser");
+        win.gBrowser.reload();
+      });
       group.append(radio1);
       group.append(radio2);
       panelHbox.append(group);
@@ -327,7 +342,8 @@ this.TrackingProtectionStudy = {
 
     gBrowser.addEventListener("DOMContentLoaded", this.onPageLoad);
     gBrowser.tabContainer.addEventListener("TabSelect", this.onTabChange);
-    gBrowser.tabContainer.addEventListener("pageshow", this.onTabChange);
+    gBrowser.tabContainer.addEventListener("pageshow", this.onPageLoad);
+    gBrowser.tabContainer.addEventListener("loadstart", this.onPageLoad);
   },
 
   uninit() {
@@ -347,7 +363,8 @@ this.TrackingProtectionStudy = {
       WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
       win.gBrowser.removeEventListener("DOMContentLoaded", this.onPageLoad);
       win.gBrowser.tabContainer.removeEventListener("TabSelect", this.onTabChange);
-      win.gBrowser.tabContainer.removeEventListener("pageshow", this.onTabChange);
+      win.gBrowser.tabContainer.removeEventListener("pageshow", this.onPageLoad);
+      win.gBrowser.tabContainer.removeEventListener("loadstart", this.onPageLoad);
 
       Services.wm.removeListener(this);
     }
