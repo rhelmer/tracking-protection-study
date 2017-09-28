@@ -83,10 +83,8 @@ this.TrackingProtectionStudy = {
   },
 
   onOpenWindow(xulWindow) {
-    let win = xulWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                       .getInterface(Components.interfaces.nsIDOMWindow)
-
-    let gBrowser = win;
+    let gBrowser = xulWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+                            .getInterface(Components.interfaces.nsIDOMWindow)
     this.addEventListeners(gBrowser);
   },
 
@@ -139,9 +137,15 @@ this.TrackingProtectionStudy = {
     if (details && details.url && details.browser) {
       let browser = details.browser;
       let currentURI = browser.currentURI;
+
       if (!currentURI) {
         return;
       }
+
+      if (!details.originUrl) {
+        return;
+      }
+
       let currentHost = currentURI.host;
       let host = new URL(details.originUrl).host;
 
@@ -168,6 +172,9 @@ this.TrackingProtectionStudy = {
    * Shows the page action button for the current window.
    */
   showPageAction(doc) {
+    let win = Services.wm.getMostRecentWindow("navigator:browser");
+    let currentHost = win.gBrowser.currentURI.host;
+
     if (!doc.getElementById("tracking-protection-study-button")) {
       let urlbar = doc.getElementById("urlbar-icons");
 
@@ -177,32 +184,36 @@ this.TrackingProtectionStudy = {
       panel.setAttribute("level", "parent");
       let panelHbox = doc.createElement("hbox");
       let group = doc.createElement("radiogroup");
-      let radio1 = doc.createElement("radio");
-      radio1.setAttribute("label", "Enable Tracking Protection");
-      radio1.addEventListener("click", () => {
-        let button = doc.getElementById("tracking-protection-study-button");
-        button.style.backgroundColor = "green";
-        let filter = {urls: new MatchPattern("*://*/*")};
-        WebRequest.onBeforeRequest.addListener(this.onBeforeRequest, filter, ["blocking"]);
-        let win = Services.wm.getMostRecentWindow("navigator:browser");
+      let enabled = doc.createElement("radio");
+      enabled.setAttribute("label", "Enable Tracking Protection");
+      enabled.addEventListener("click", () => {
+        if (this.state.allowedHosts.includes(currentHost)) {
+          delete this.state.allowedHosts[currentHost];
+        }
         win.gBrowser.reload();
       });
-      let radio2 = doc.createElement("radio");
-      radio2.setAttribute("label", "Disable Tracking Protection");
-      radio2.addEventListener("click", () => {
-        let button = doc.getElementById("tracking-protection-study-button");
-        button.style.backgroundColor = "yellow";
-        WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
-        let win = Services.wm.getMostRecentWindow("navigator:browser");
+      let disabled = doc.createElement("radio");
+      disabled.setAttribute("label", "Disable Tracking Protection");
+      disabled.addEventListener("click", () => {
+        this.state.allowedHosts.push(currentHost);
         win.gBrowser.reload();
       });
-      group.append(radio1);
-      group.append(radio2);
+      if (this.state.allowedHosts.includes(currentHost)) {
+        disabled.setAttribute("selected", true);
+      } else {
+        enabled.setAttribute("selected", true);
+      }
+      group.append(enabled);
+      group.append(disabled);
       panelHbox.append(group);
       panel.append(panelHbox);
 
       let button = doc.createElement("toolbarbutton");
-      button.style.backgroundColor = "green";
+      if (this.state.allowedHosts.includes(currentHost)) {
+        button.style.backgroundColor = "yellow";
+      } else {
+        button.style.backgroundColor = "green";
+      }
       button.setAttribute("id", "tracking-protection-study-button");
       button.setAttribute("image", "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled");
       button.append(panel);

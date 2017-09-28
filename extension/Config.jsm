@@ -24,7 +24,7 @@ const config = {
 
     variation: {
       name: "opentab",
-      campaign_id: "download-2",
+      campaign_id: "download-1",
     },
 
     weightedVariations: [
