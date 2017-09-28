@@ -93,6 +93,7 @@ this.TrackingProtectionStudy = {
   onPageLoad: (evt) => {
     let doc = evt.originalTarget;
     this.hidePageAction(doc);
+    this.setPageActionCounter(doc, 0);
 
     let currentHost = new URL(doc.location.href).host;
     this.state.blockedResources.set(currentHost, 0);
@@ -100,6 +101,7 @@ this.TrackingProtectionStudy = {
     if (doc.location.href == "about:newtab") {
       let minutes = this.timeSaved / 1000 / 60;
 
+      // FIXME commented out for testing
       // if (minutes >= 1 && this.blockedRequests) {
       if (minutes && this.blockedRequests) {
         let message = this.newtab_message;
