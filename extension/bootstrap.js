@@ -94,7 +94,7 @@ this.TrackingProtectionStudy = {
     this.setPageActionCounter(doc, 0);
 
     let currentHost = new URL(browser._documentURI.spec).host;
-    this.state.blockedResources.set(currentHost, 0);
+    this.state.blockedResources.set(browser, 0);
 
     if (doc.location.href == "about:newtab") {
       let minutes = this.timeSaved / 1000 / 60;
@@ -150,20 +150,21 @@ this.TrackingProtectionStudy = {
       let host = new URL(details.originUrl).host;
 
       if (currentHost != host && blocklists.hostInBlocklist(this.state.blocklist, host)) {
-        console.log(`Tracking Protection study has blocked a request to: ${host}`);
+        // TODO
+        if (this.state.allowedHosts.has(currentHost)) {}
         let counter;
-        if (this.state.blockedResources.has(currentHost)) {
-          counter = this.state.blockedResources.get(currentHost);
+        if (this.state.blockedResources.has(details.browser)) {
+          counter = this.state.blockedResources.get(details.browser);
           counter++;
         } else {
           counter = 1;
         }
 
-        this.state.blockedResources.set(currentHost, counter);
+        this.state.blockedResources.set(details.browser, counter);
         this.state.totalBlockedResources += counter;
 
         let win = Services.wm.getMostRecentWindow("navigator:browser");
-        if (currentHost == win.gBrowser.currentURI.host) {
+        if (details.browser == win.gBrowser.selectedBrowser) {
           this.showPageAction(browser.getRootNode());
           this.setPageActionCounter(browser.getRootNode(), counter);
         }
@@ -189,9 +190,12 @@ this.TrackingProtectionStudy = {
       panel.setAttribute("type", "arrow");
       panel.setAttribute("level", "parent");
       let panelHbox = doc.createElement("hbox");
+
+      let controls = doc.createElement("vbox");
+
       let group = doc.createElement("radiogroup");
       let enabled = doc.createElement("radio");
-      enabled.setAttribute("label", "Enable Tracking Protection");
+      enabled.setAttribute("label", "Enable on this site");
       enabled.addEventListener("click", () => {
         if (this.state.allowedHosts.has(currentHost)) {
           this.state.allowedHosts.delete(currentHost);
@@ -199,7 +203,7 @@ this.TrackingProtectionStudy = {
         win.gBrowser.reload();
       });
       let disabled = doc.createElement("radio");
-      disabled.setAttribute("label", "Disable Tracking Protection");
+      disabled.setAttribute("label", "Disable on this site");
       disabled.addEventListener("click", () => {
         this.state.allowedHosts.add(currentHost);
         win.gBrowser.reload();
@@ -211,7 +215,14 @@ this.TrackingProtectionStudy = {
       }
       group.append(enabled);
       group.append(disabled);
-      panelHbox.append(group);
+      controls.append(group);
+
+      let footer = doc.createElement("vbox");
+      footer.setAttribute("value", "If the website appears broken, consider disabling" +
+                                   "tracking protection and refreshing the page.");
+
+      panelHbox.append(controls);
+      panelHbox.append(footer);
       panel.append(panelHbox);
 
       let button = doc.createElement("toolbarbutton");
@@ -258,7 +269,7 @@ this.TrackingProtectionStudy = {
     if (win == currentWin) {
       this.hidePageAction(win.document);
       let currentHost = win.gBrowser.currentURI.host;
-      let counter = this.state.blockedResources.get(currentHost);
+      let counter = this.state.blockedResources.get(win.gBrowser.selectedBrowser);
 
       if (counter) {
         this.showPageAction(win.document);
