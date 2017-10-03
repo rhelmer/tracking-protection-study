@@ -161,8 +161,6 @@ this.TrackingProtectionStudy = {
 
         result = {cancel: true};
 
-        // Update page counter for the current tab, on all open windows.
-        // The onTabChange handler will handle tab changes within a window.
         let enumerator = Services.wm.getEnumerator("navigator:browser");
         while (enumerator.hasMoreElements()) {
           let win = enumerator.getNext();
@@ -170,11 +168,9 @@ this.TrackingProtectionStudy = {
             continue;
           }
 
-          for (let browser of win.gBrowser.browsers) {
-            if (details.browser == win.gBrowser.selectedBrowser) {
-              this.showPageAction(browser.getRootNode());
-              this.setPageActionCounter(browser.getRootNode(), counter);
-            }
+          if (details.browser == win.gBrowser.selectedBrowser) {
+            this.showPageAction(browser.getRootNode());
+            this.setPageActionCounter(browser.getRootNode(), counter);
           }
         }
       }
