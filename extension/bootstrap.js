@@ -238,12 +238,13 @@ this.TrackingProtectionStudy = {
       // FIXME commented out for testing
       // if (minutes >= 1 && this.blockedRequests) {
       if (this.state.totalBlockedResources) {
-        console.log("rhelmer debug3");
+        console.log("rhelmer debug3", doc.getElementById("newtab-margin-top"));
         let message = this.newtab_message;
         message = message.replace("${blockedRequests}", this.state.totalBlockedResources);
         message = message.replace("${blockedEntities}", this.state.totalBlockedEntities);
         message = message.replace("${blockedSites}", this.state.totalBlockedSites);
         message = message.replace("${minutes}", minutes.toPrecision(3));
+        console.log("rhelmer debug4", message);
 
         let logo = doc.createElement("img");
         logo.src = "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled";
