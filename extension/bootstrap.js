@@ -52,11 +52,6 @@ async function chooseVariation() {
 }
 
 this.TrackingProtectionStudy = {
-  timeSaved: 0,
-  blockedRequests: 0,
-  blockedSites: 0,
-  blockedEntities: 0,
-
   /**
    * Open doorhanger-style notification on desired chrome window.
    *
@@ -90,15 +85,14 @@ this.TrackingProtectionStudy = {
 
   onLocationChange(browser, progress, request, uri) {
     if (this.state.blockedResources.has(browser)) {
+      this.showPageAction(browser.getRootNode());
       this.setPageActionCounter(browser.getRootNode(), 0);
       this.state.blockedResources.set(browser, 0);
     }
 
-    let doc = browser.getRootNode();
-
-    if (doc.location.href == "about:newtab") {
-      let minutes = this.timeSaved / 1000 / 60;
-
+    if (browser.currentURI.spec == "about:newtab") {
+      let doc = browser.contentDocument;
+      let minutes = this.state.timeSaved / 1000 / 60;
       // FIXME commented out for testing
       // if (minutes >= 1 && this.blockedRequests) {
       if (this.state.totalBlockedResources) {
@@ -108,7 +102,6 @@ this.TrackingProtectionStudy = {
         message = message.replace("${blockedSites}", this.state.blockedSites);
         message = message.replace("${minutes}", minutes.toPrecision(3));
 
-        let container = doc.getElementById("newtab-margin-top");
         let logo = doc.createElement("img");
         logo.src = "resource://tracking-protection-study/img/blok-48.png";
         logo.style.height = 48;
@@ -127,6 +120,8 @@ this.TrackingProtectionStudy = {
         newContainer.style.padding = "24px";
         newContainer.append(logo);
         newContainer.append(span);
+
+        let container = doc.getElementById("newtab-margin-top");
         container.append(newContainer);
       }
     }
@@ -190,65 +185,68 @@ this.TrackingProtectionStudy = {
     let win = Services.wm.getMostRecentWindow("navigator:browser");
     let currentHost = win.gBrowser.currentURI.host;
 
-    if (!doc.getElementById("tracking-protection-study-button")) {
-      let urlbar = doc.getElementById("urlbar-icons");
-
-      let panel = doc.createElement("panel");
-      panel.setAttribute("id", "tracking-protection-study-panel");
-      panel.setAttribute("type", "arrow");
-      panel.setAttribute("level", "parent");
-      let panelHbox = doc.createElement("hbox");
-
-      let controls = doc.createElement("vbox");
-
-      let group = doc.createElement("radiogroup");
-      let enabled = doc.createElement("radio");
-      enabled.setAttribute("label", "Enable on this site");
-      enabled.addEventListener("click", () => {
-        if (this.state.allowedHosts.has(currentHost)) {
-          this.state.allowedHosts.delete(currentHost);
-        }
-        win.gBrowser.reload();
-      });
-      let disabled = doc.createElement("radio");
-      disabled.setAttribute("label", "Disable on this site");
-      disabled.addEventListener("click", () => {
-        this.state.allowedHosts.add(currentHost);
-        win.gBrowser.reload();
-      });
-      if (this.state.allowedHosts.has(currentHost)) {
-        disabled.setAttribute("selected", true);
-      } else {
-        enabled.setAttribute("selected", true);
-      }
-      group.append(enabled);
-      group.append(disabled);
-      controls.append(group);
-
-      let footer = doc.createElement("vbox");
-      footer.setAttribute("value", "If the website appears broken, consider disabling" +
-                                   "tracking protection and refreshing the page.");
-
-      panelHbox.append(controls);
-      panelHbox.append(footer);
-      panel.append(panelHbox);
-
-      let button = doc.createElement("toolbarbutton");
-      if (this.state.allowedHosts.has(currentHost)) {
-        button.style.backgroundColor = "yellow";
-      } else {
-        button.style.backgroundColor = "green";
-      }
-      button.setAttribute("id", "tracking-protection-study-button");
-      button.setAttribute("image", "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled");
-      button.append(panel);
-      button.addEventListener("command", event => {
-        doc.getElementById("panel");
-        panel.openPopup(button);
-      });
-
-      urlbar.append(button);
+    let button = doc.getElementById("tracking-protection-study-button");
+    if (button) {
+      button.parentElement.removeChild(button);
     }
+    doc.getElementById("tracking")
+    let urlbar = doc.getElementById("urlbar-icons");
+
+    let panel = doc.createElement("panel");
+    panel.setAttribute("id", "tracking-protection-study-panel");
+    panel.setAttribute("type", "arrow");
+    panel.setAttribute("level", "parent");
+    let panelHbox = doc.createElement("hbox");
+
+    let controls = doc.createElement("vbox");
+
+    let group = doc.createElement("radiogroup");
+    let enabled = doc.createElement("radio");
+    enabled.setAttribute("label", "Enable on this site");
+    enabled.addEventListener("click", () => {
+      if (this.state.allowedHosts.has(currentHost)) {
+        this.state.allowedHosts.delete(currentHost);
+      }
+      win.gBrowser.reload();
+    });
+    let disabled = doc.createElement("radio");
+    disabled.setAttribute("label", "Disable on this site");
+    disabled.addEventListener("click", () => {
+      this.state.allowedHosts.add(currentHost);
+      win.gBrowser.reload();
+    });
+    if (this.state.allowedHosts.has(currentHost)) {
+      disabled.setAttribute("selected", true);
+    } else {
+      enabled.setAttribute("selected", true);
+    }
+    group.append(enabled);
+    group.append(disabled);
+    controls.append(group);
+
+    let footer = doc.createElement("vbox");
+    footer.setAttribute("value", "If the website appears broken, consider disabling" +
+                                  "tracking protection and refreshing the page.");
+
+    panelHbox.append(controls);
+    panelHbox.append(footer);
+    panel.append(panelHbox);
+
+    button = doc.createElement("toolbarbutton");
+    if (this.state.allowedHosts.has(currentHost)) {
+      button.style.backgroundColor = "yellow";
+    } else {
+      button.style.backgroundColor = "green";
+    }
+    button.setAttribute("id", "tracking-protection-study-button");
+    button.setAttribute("image", "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled");
+    button.append(panel);
+    button.addEventListener("command", event => {
+      doc.getElementById("panel");
+      panel.openPopup(button);
+    });
+
+    urlbar.append(button);
   },
 
   setPageActionCounter(doc, counter) {
@@ -343,6 +341,7 @@ this.TrackingProtectionStudy = {
     }
 
     this.state = {
+      timeSave: 0,
       blocklist: new Map(),
       allowedHosts: new Set(),
       reportedHosts: {},
