@@ -1,6 +1,8 @@
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "canonicalizeHost",
+  "resource://tracking-protection-study/Canonicalize.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "blocklists",
   "resource://tracking-protection-study/BlockLists.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Services",
@@ -97,6 +99,15 @@ this.TrackingProtectionStudy = {
           this.state.totalAllowedResources += 1;
         } else {
           this.state.totalBlockedResources += 1;
+        }
+
+        let domain = host.split(".");
+        domain.shift();
+        let rootDomain = domain.join(".");
+        for (let entity in this.state.entityList) {
+          if (this.state.entityList[entity].resources.includes(rootDomain)) {
+            this.state.totalBlockedEntities.add(entity);
+          }
         }
 
         this.state.blockedResources.set(details.browser, counter);
@@ -224,27 +235,24 @@ this.TrackingProtectionStudy = {
     }
   },
 
+  // FIXME need to do this on pageload instead
   onTabOpen(evt) {
     let win = evt.target.ownerGlobal;
     let currentURI = win.gBrowser.currentURI;
     if (currentURI.spec == "about:newtab") {
-      console.log("rhelmer debug1");
       let doc = win.gBrowser.contentDocument;
       if (doc.getElementById("tracking-protection-message")) {
         return;
       }
-      console.log("rhelmer debug2");
       let minutes = this.state.timeSaved / 1000 / 60;
       // FIXME commented out for testing
       // if (minutes >= 1 && this.blockedRequests) {
       if (this.state.totalBlockedResources) {
-        console.log("rhelmer debug3", doc.getElementById("newtab-margin-top"));
         let message = this.newtab_message;
         message = message.replace("${blockedRequests}", this.state.totalBlockedResources);
-        message = message.replace("${blockedEntities}", this.state.totalBlockedEntities);
+        message = message.replace("${blockedEntities}", this.state.totalBlockedEntities.size);
         message = message.replace("${blockedSites}", this.state.totalBlockedSites);
         message = message.replace("${minutes}", minutes.toPrecision(3));
-        console.log("rhelmer debug4", message);
 
         let logo = doc.createElement("img");
         logo.src = "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled";
@@ -325,7 +333,8 @@ this.TrackingProtectionStudy = {
       entityList: {},
       blockedResources: new Map(),
       totalBlockedResources: 0,
-      totalAllowedResources: 0
+      totalAllowedResources: 0,
+      totalBlockedEntities: new Set(),
     }
 
     await blocklists.loadLists(this.state);
