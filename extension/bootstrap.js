@@ -90,11 +90,6 @@ this.TrackingProtectionStudy = {
 
   onLocationChange(browser, progress, request, uri) {
     let doc = browser.getRootNode();
-    this.hidePageAction(doc);
-    this.setPageActionCounter(doc, 0);
-
-    let currentHost = new URL(browser._documentURI.spec).host;
-    this.state.blockedResources.set(browser, 0);
 
     if (doc.location.href == "about:newtab") {
       let minutes = this.timeSaved / 1000 / 60;
@@ -264,11 +259,11 @@ this.TrackingProtectionStudy = {
       this.hidePageAction(win.document);
       return;
     }
+
     let currentWin = Services.wm.getMostRecentWindow("navigator:browser");
 
     if (win == currentWin) {
       this.hidePageAction(win.document);
-      let currentHost = win.gBrowser.currentURI.host;
       let counter = this.state.blockedResources.get(win.gBrowser.selectedBrowser);
 
       if (counter) {
