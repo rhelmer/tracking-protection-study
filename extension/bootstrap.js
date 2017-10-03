@@ -3,8 +3,6 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "blocklists",
   "resource://tracking-protection-study/BlockLists.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "config",
-  "resource://tracking-protection-study/Config.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Services",
   "resource://gre/modules/Services.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "WebRequest",
@@ -57,10 +55,6 @@ this.TrackingProtectionStudy = {
   },
 
   onLocationChange(browser, progress, request, uri, flags) {
-    if (!request.isDocument) {
-      return;
-    }
-
     if (this.state.blockedResources.has(browser)) {
       this.showPageAction(browser.getRootNode());
       this.setPageActionCounter(browser.getRootNode(), 0);
@@ -287,26 +281,15 @@ this.TrackingProtectionStudy = {
       opentab: this.openURL,
     }
 
-    this.treatment = studyUtils.getVariation().name;
-    this.campaign_id = await config.study.getCampaignId();
-
-    let campaigns = config.study.campaigns;
-
-    if (this.treatment in campaigns) {
-      let campaign = campaigns[this.treatment];
-      for (let i = 0; i < campaign.campaign_ids.length; i++) {
-        if (this.campaign_id === campaign.campaign_ids[i]) {
-          this.message = campaign.messages[i];
-          this.newtab_message = campaign.newtab_messages[i];
-          this.url = campaign.urls[i];
-        }
-      }
-    }
-
-    if (this.treatment !== "control" && !this.message && !this.url) {
-      await studyUtils.endStudy({ reason: "invalid config" });
-      throw `No config found for campaign ID: ${this.campaign_id} for ${this.treatment}`;
-    }
+    // TODO hardcode for the moment, but get from distribution ID instead
+    this.treatment = "opentab";
+    this.distribution_id = "test123";
+    let newtab_messages = [
+      "Firefox blocked ${blockedRequests} trackers today<br/> from ${blockedEntities} companies that track your browsing",
+      "Firefox blocked ${blockedRequests} trackers today<br/> and saved you ${minutes} minutes",
+      "Firefox blocked ${blockedRequests} ads today from<br/> ${blockedSites} different websites"
+    ];
+    this.newtab_message = newtab_messages[0];
 
     // run once now on the most recent window.
     let win = Services.wm.getMostRecentWindow("navigator:browser");
@@ -395,8 +378,6 @@ this.TrackingProtectionStudy = {
 
 this.shutdown = function() {
   TrackingProtectionStudy.uninit();
-  Cu.unload("resource://tracking-protection-study/StudyUtils.jsm");
-  Cu.unload("resource://tracking-protection-study/Config.jsm");
   Cu.unload("resource://tracking-protection-study/Blocklists.jsm");
 };
 
