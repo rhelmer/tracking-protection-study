@@ -20,6 +20,7 @@ Cu.importGlobalProperties(["URL"]);
 // const TRACKING_PROTECTION_UI_PREF = "privacy.trackingprotection.ui.enabled";
 const DOORHANGER_ID = "onboarding-trackingprotection-notification";
 const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
+const STYLESHEET_URL = "resource://tracking-protection-study/tracking-protection-study.css";
 
 this.TrackingProtectionStudy = {
   /**
@@ -59,46 +60,50 @@ this.TrackingProtectionStudy = {
       this.setPageActionCounter(browser.getRootNode(), 0);
       this.state.blockedResources.set(browser, 0);
     }
-    if (browser.currentURI.spec == "about:newtab") {
-      let doc = browser.contentDocument;
-      if (doc.getElementById("tracking-protection-message")) {
-        return;
+    let win = browser.ownerGlobal;
+    win.addEventListener("load", () => {
+      console.log("rhelmer debug");
+      if (browser.currentURI.spec == "about:newtab") {
+        let doc = browser.contentDocument;
+        if (doc.getElementById("tracking-protection-message")) {
+          return;
+        }
+        let minutes = this.state.timeSaved / 1000 / 60;
+        // FIXME commented out for testing
+        // if (minutes >= 1 && this.blockedRequests) {
+        if (this.state.totalBlockedResources) {
+          let message = this.newtab_message;
+          message = message.replace("${blockedRequests}", this.state.totalBlockedResources);
+          message = message.replace("${blockedEntities}", this.state.totalBlockedEntities);
+          message = message.replace("${blockedSites}", this.state.totalBlockedSites);
+          message = message.replace("${minutes}", minutes.toPrecision(3));
+
+          let logo = doc.createElement("img");
+          logo.src = "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled";
+          logo.style.height = 48;
+          logo.style.width = 48;
+          logo.style.float = "left";
+          logo.style.padding = "5px";
+
+          let span = doc.createElement("span");
+          span.style.fontSize = "24px";
+          span.style.fontWeight = "lighter";
+          span.style.float = "right";
+          span.style.padding = "5px";
+          span.innerHTML = message;
+
+          let newContainer = doc.createElement("div");
+          newContainer.id = "tracking-protection-message";
+          newContainer.style.padding = "24px";
+          newContainer.append(logo);
+          newContainer.append(span);
+
+          console.log("rhelmer debug", doc);
+          let container = doc.getElementById("newtab-margin-top");
+          container.append(newContainer);
+        }
       }
-      let minutes = this.state.timeSaved / 1000 / 60;
-      // FIXME commented out for testing
-      // if (minutes >= 1 && this.blockedRequests) {
-      if (this.state.totalBlockedResources) {
-        let message = this.newtab_message;
-        message = message.replace("${blockedRequests}", this.state.totalBlockedResources);
-        message = message.replace("${blockedEntities}", this.state.totalBlockedEntities);
-        message = message.replace("${blockedSites}", this.state.totalBlockedSites);
-        message = message.replace("${minutes}", minutes.toPrecision(3));
-
-        let logo = doc.createElement("img");
-        logo.src = "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled";
-        logo.style.height = 48;
-        logo.style.width = 48;
-        logo.style.float = "left";
-        logo.style.padding = "5px";
-
-        let span = doc.createElement("span");
-        span.style.fontSize = "24px";
-        span.style.fontWeight = "lighter";
-        span.style.float = "right";
-        span.style.padding = "5px";
-        span.innerHTML = message;
-
-        let newContainer = doc.createElement("div");
-        newContainer.id = "tracking-protection-message";
-        newContainer.style.padding = "24px";
-        newContainer.append(logo);
-        newContainer.append(span);
-
-        console.log("rhelmer debug", doc);
-        let container = doc.getElementById("newtab-margin-top");
-        container.append(newContainer);
-      }
-    }
+    }, {once: true});
   },
 
   onBeforeRequest(details) {
@@ -322,8 +327,7 @@ this.TrackingProtectionStudy = {
 
     WebRequest.onBeforeRequest.addListener(this.onBeforeRequest, filter, ["blocking"]);
 
-    let url = "resource://tracking-protection-study/tracking-protection-study.css";
-    let uri = Services.io.newURI(url);
+    let uri = Services.io.newURI(STYLESHEET_URL);
     styleSheetService.loadAndRegisterSheet(uri, styleSheetService.AGENT_SHEET);
 
     // Add listeners to all open windows.
@@ -370,8 +374,7 @@ this.TrackingProtectionStudy = {
       Services.wm.removeListener(this);
     }
 
-    let url = "chrome://tracking-protection-study/content/tracking-protection-study.css";
-    let uri = Services.io.newURI(url);
+    let uri = Services.io.newURI(STYLESHEET_URL);
     styleSheetService.unregisterSheet(uri, styleSheetService.AGENT_SHEET);
   }
 }
