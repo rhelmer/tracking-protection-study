@@ -7,8 +7,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "config",
   "resource://tracking-protection-study/Config.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Services",
   "resource://gre/modules/Services.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "studyUtils",
-  "resource://tracking-protection-study/StudyUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "WebRequest",
   "resource://gre/modules/WebRequest.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "MatchPattern",
@@ -24,32 +22,6 @@ Cu.importGlobalProperties(["URL"]);
 // const TRACKING_PROTECTION_UI_PREF = "privacy.trackingprotection.ui.enabled";
 const DOORHANGER_ID = "onboarding-trackingprotection-notification";
 const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
-
-const REASONS = {
-  APP_STARTUP:      1, // The application is starting up.
-  APP_SHUTDOWN:     2, // The application is shutting down.
-  ADDON_ENABLE:     3, // The add-on is being enabled.
-  ADDON_DISABLE:    4, // The add-on is being disabled. (Also sent during uninstallation)
-  ADDON_INSTALL:    5, // The add-on is being installed.
-  ADDON_UNINSTALL:  6, // The add-on is being uninstalled.
-  ADDON_UPGRADE:    7, // The add-on is being upgraded.
-  ADDON_DOWNGRADE:  8, // The add-on is being downgraded.
-};
-
-async function chooseVariation() {
-  let variation;
-  const sample = studyUtils.sample;
-
-  if (config.study.variation) {
-    variation = config.study.variation;
-  } else {
-    // this is the standard arm choosing method
-    const clientId = await studyUtils.getTelemetryId();
-    const hashFraction = await sample.hashFraction(config.study.studyName + clientId);
-    variation = sample.chooseWeighted(config.study.weightedVariations, hashFraction);
-  }
-  return variation;
-}
 
 this.TrackingProtectionStudy = {
   /**
@@ -77,29 +49,36 @@ this.TrackingProtectionStudy = {
       null, action, [], options);
   },
 
-  onOpenWindow(win) {
-    // TODO
-    win = Services.wm.getMostRecentWindow("navigator:browser");
+  onOpenWindow(xulWindow) {
+    var win = xulWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+              .getInterface(Ci.nsIDOMWindowInternal || Ci.nsIDOMWindow);
+
     this.addEventListeners(win.gBrowser);
   },
 
-  onLocationChange(browser, progress, request, uri) {
+  onLocationChange(browser, progress, request, uri, flags) {
+    if (!request.isDocument) {
+      return;
+    }
+
     if (this.state.blockedResources.has(browser)) {
       this.showPageAction(browser.getRootNode());
       this.setPageActionCounter(browser.getRootNode(), 0);
       this.state.blockedResources.set(browser, 0);
     }
-
     if (browser.currentURI.spec == "about:newtab") {
       let doc = browser.contentDocument;
+      if (doc.getElementById("tracking-protection-message")) {
+        return;
+      }
       let minutes = this.state.timeSaved / 1000 / 60;
       // FIXME commented out for testing
       // if (minutes >= 1 && this.blockedRequests) {
       if (this.state.totalBlockedResources) {
         let message = this.newtab_message;
-        message = message.replace("${blockedRequests}", this.state.blockedRequests);
-        message = message.replace("${blockedEntities}", this.state.blockedEntities);
-        message = message.replace("${blockedSites}", this.state.blockedSites);
+        message = message.replace("${blockedRequests}", this.state.totalBlockedResources);
+        message = message.replace("${blockedEntities}", this.state.totalBlockedEntities);
+        message = message.replace("${blockedSites}", this.state.totalBlockedSites);
         message = message.replace("${minutes}", minutes.toPrecision(3));
 
         let logo = doc.createElement("img");
@@ -117,6 +96,7 @@ this.TrackingProtectionStudy = {
         span.innerHTML = message;
 
         let newContainer = doc.createElement("div");
+        newContainer.id = "tracking-protection-message";
         newContainer.style.padding = "24px";
         newContainer.append(logo);
         newContainer.append(span);
@@ -154,8 +134,10 @@ this.TrackingProtectionStudy = {
         }
 
         // TODO enable allowed hosts.
-        if (!this.state.allowedHosts.has(currentHost)) {
-          this.state.totalBlockedResources += counter;
+        if (this.state.allowedHosts.has(currentHost)) {
+          this.state.totalAllowedResources += 1;
+        } else {
+          this.state.totalBlockedResources += 1;
         }
 
         this.state.blockedResources.set(details.browser, counter);
@@ -346,7 +328,8 @@ this.TrackingProtectionStudy = {
       reportedHosts: {},
       entityList: {},
       blockedResources: new Map(),
-      totalBlockedResources: 0
+      totalBlockedResources: 0,
+      totalAllowedResources: 0
     }
 
     await blocklists.loadLists(this.state);
@@ -420,48 +403,10 @@ this.shutdown = function() {
 this.install = function(data, reason) {};
 
 this.startup = async function(data, reason) {
-
-  studyUtils.setup({
-    studyName: config.study.studyName,
-    endings: config.study.endings,
-    addon: { id: data.id, version: data.version },
-    telemetry: config.study.telemetry,
-  });
-
-  studyUtils.setLoggingLevel(config.log.studyUtils.level);
-  const variation = await chooseVariation();
-  studyUtils.setVariation(variation);
-
-  if (reason === REASONS.ADDON_INSTALL) {
-    studyUtils.firstSeen(); // sends telemetry "enter"
-    const eligible = await config.isEligible(); // addon-specific
-    if (!eligible) {
-      // uses config.endings.ineligible.url if any,
-      // sends UT for "ineligible"
-      // then uninstalls addon
-      await studyUtils.endStudy({ reason: "ineligible" });
-      return;
-    }
-  }
-  // sets experiment as active and sends installed telemetry
-  await studyUtils.startup({ reason });
-
   TrackingProtectionStudy.init();
 };
 
 this.shutdown = this.uninstall = function(data, reason) {
 
   TrackingProtectionStudy.uninit();
-
-  // are we uninstalling due to user or automatic?
-  if (reason === REASONS.ADDON_UNINSTALL || reason === REASONS.ADDON_DISABLE) {
-    // reset the preference in case of uninstall or disable, primarily for testing
-    // purposes
-    Services.prefs.setBoolPref("extensions.trackingprotectionstudy.counter", 0);
-    if (!studyUtils._isEnding) {
-      // we are the first requestors, must be user action.
-      studyUtils.endStudy({ reason: "user-disable" });
-    }
-  }
-
 }
