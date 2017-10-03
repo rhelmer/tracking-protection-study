@@ -60,50 +60,6 @@ this.TrackingProtectionStudy = {
       this.setPageActionCounter(browser.getRootNode(), 0);
       this.state.blockedResources.set(browser, 0);
     }
-    let win = browser.ownerGlobal;
-    win.addEventListener("load", () => {
-      console.log("rhelmer debug");
-      if (browser.currentURI.spec == "about:newtab") {
-        let doc = browser.contentDocument;
-        if (doc.getElementById("tracking-protection-message")) {
-          return;
-        }
-        let minutes = this.state.timeSaved / 1000 / 60;
-        // FIXME commented out for testing
-        // if (minutes >= 1 && this.blockedRequests) {
-        if (this.state.totalBlockedResources) {
-          let message = this.newtab_message;
-          message = message.replace("${blockedRequests}", this.state.totalBlockedResources);
-          message = message.replace("${blockedEntities}", this.state.totalBlockedEntities);
-          message = message.replace("${blockedSites}", this.state.totalBlockedSites);
-          message = message.replace("${minutes}", minutes.toPrecision(3));
-
-          let logo = doc.createElement("img");
-          logo.src = "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled";
-          logo.style.height = 48;
-          logo.style.width = 48;
-          logo.style.float = "left";
-          logo.style.padding = "5px";
-
-          let span = doc.createElement("span");
-          span.style.fontSize = "24px";
-          span.style.fontWeight = "lighter";
-          span.style.float = "right";
-          span.style.padding = "5px";
-          span.innerHTML = message;
-
-          let newContainer = doc.createElement("div");
-          newContainer.id = "tracking-protection-message";
-          newContainer.style.padding = "24px";
-          newContainer.append(logo);
-          newContainer.append(span);
-
-          console.log("rhelmer debug", doc);
-          let container = doc.getElementById("newtab-margin-top");
-          container.append(newContainer);
-        }
-      }
-    }, {once: true});
   },
 
   onBeforeRequest(details) {
@@ -116,6 +72,10 @@ this.TrackingProtectionStudy = {
       }
 
       if (!details.originUrl) {
+        return;
+      }
+
+      if (currentURI.scheme != "http" && currentURI.scheme != "https") {
         return;
       }
 
@@ -264,6 +224,53 @@ this.TrackingProtectionStudy = {
     }
   },
 
+  onTabOpen(evt) {
+    let win = evt.target.ownerGlobal;
+    let currentURI = win.gBrowser.currentURI;
+    if (currentURI.spec == "about:newtab") {
+      console.log("rhelmer debug1");
+      let doc = win.gBrowser.contentDocument;
+      if (doc.getElementById("tracking-protection-message")) {
+        return;
+      }
+      console.log("rhelmer debug2");
+      let minutes = this.state.timeSaved / 1000 / 60;
+      // FIXME commented out for testing
+      // if (minutes >= 1 && this.blockedRequests) {
+      if (this.state.totalBlockedResources) {
+        console.log("rhelmer debug3");
+        let message = this.newtab_message;
+        message = message.replace("${blockedRequests}", this.state.totalBlockedResources);
+        message = message.replace("${blockedEntities}", this.state.totalBlockedEntities);
+        message = message.replace("${blockedSites}", this.state.totalBlockedSites);
+        message = message.replace("${minutes}", minutes.toPrecision(3));
+
+        let logo = doc.createElement("img");
+        logo.src = "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled";
+        logo.style.height = 48;
+        logo.style.width = 48;
+        logo.style.float = "left";
+        logo.style.padding = "5px";
+
+        let span = doc.createElement("span");
+        span.style.fontSize = "24px";
+        span.style.fontWeight = "lighter";
+        span.style.float = "right";
+        span.style.padding = "5px";
+        span.innerHTML = message;
+
+        let newContainer = doc.createElement("div");
+        newContainer.id = "tracking-protection-message";
+        newContainer.style.padding = "24px";
+        newContainer.append(logo);
+        newContainer.append(span);
+
+        let container = doc.getElementById("newtab-margin-top");
+        container.append(newContainer);
+      }
+    }
+  },
+
   /**
    * Open URL in new tab on desired chrome window.
    *
@@ -348,9 +355,11 @@ this.TrackingProtectionStudy = {
 
   addEventListeners(gBrowser) {
     this.onTabChange = this.onTabChange.bind(this);
+    this.onTabOpen = this.onTabOpen.bind(this);
 
     gBrowser.addTabsProgressListener(this);
     gBrowser.tabContainer.addEventListener("TabSelect", this.onTabChange);
+    gBrowser.tabContainer.addEventListener("TabOpen", this.onTabOpen);
   },
 
   uninit() {
@@ -370,6 +379,7 @@ this.TrackingProtectionStudy = {
       WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
       win.gBrowser.removeTabsProgressListener(this);
       win.gBrowser.tabContainer.removeEventListener("TabSelect", this.onTabChange);
+      win.gBrowser.tabContainer.removeEventListener("TabOpen", this.onTabOpen);
 
       Services.wm.removeListener(this);
     }
