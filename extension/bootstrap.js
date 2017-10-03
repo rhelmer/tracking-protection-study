@@ -159,7 +159,6 @@ this.TrackingProtectionStudy = {
         this.state.blockedResources.set(details.browser, counter);
         this.state.totalBlockedResources += counter;
 
-        this.state.blockedResources.set(details.browser, counter);
         result = {cancel: true};
 
         // Update page counter for the current tab, on all open windows.
