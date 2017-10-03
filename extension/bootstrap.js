@@ -77,10 +77,10 @@ this.TrackingProtectionStudy = {
       null, action, [], options);
   },
 
-  onOpenWindow(xulWindow) {
-    let gBrowser = xulWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                            .getInterface(Components.interfaces.nsIDOMWindow)
-    this.addEventListeners(gBrowser);
+  onOpenWindow(win) {
+    // TODO
+    win = Services.wm.getMostRecentWindow("navigator:browser");
+    this.addEventListeners(win.gBrowser);
   },
 
   onLocationChange(browser, progress, request, uri) {
@@ -128,7 +128,6 @@ this.TrackingProtectionStudy = {
   },
 
   onBeforeRequest(details) {
-    let result;
     if (details && details.url && details.browser) {
       let browser = details.browser;
       let currentURI = browser.currentURI;
@@ -146,8 +145,6 @@ this.TrackingProtectionStudy = {
 
       // Block third-party requests only.
       if (currentHost != host && blocklists.hostInBlocklist(this.state.blocklist, host)) {
-        // TODO enable allowed hosts.
-        if (this.state.allowedHosts.has(currentHost)) {}
         let counter;
         if (this.state.blockedResources.has(details.browser)) {
           counter = this.state.blockedResources.get(details.browser);
@@ -156,10 +153,12 @@ this.TrackingProtectionStudy = {
           counter = 1;
         }
 
-        this.state.blockedResources.set(details.browser, counter);
-        this.state.totalBlockedResources += counter;
+        // TODO enable allowed hosts.
+        if (!this.state.allowedHosts.has(currentHost)) {
+          this.state.totalBlockedResources += counter;
+        }
 
-        result = {cancel: true};
+        this.state.blockedResources.set(details.browser, counter);
 
         let enumerator = Services.wm.getEnumerator("navigator:browser");
         while (enumerator.hasMoreElements()) {
@@ -173,9 +172,9 @@ this.TrackingProtectionStudy = {
             this.setPageActionCounter(browser.getRootNode(), counter);
           }
         }
+        return {cancel: true};
       }
     }
-    return result;
   },
 
   /**
