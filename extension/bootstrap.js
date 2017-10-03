@@ -76,7 +76,7 @@ this.TrackingProtectionStudy = {
         message = message.replace("${minutes}", minutes.toPrecision(3));
 
         let logo = doc.createElement("img");
-        logo.src = "resource://tracking-protection-study/img/blok-48.png";
+        logo.src = "chrome://browser/skin/controlcenter/tracking-protection.svg#enabled";
         logo.style.height = 48;
         logo.style.width = 48;
         logo.style.float = "left";
