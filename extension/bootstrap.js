@@ -89,6 +89,11 @@ this.TrackingProtectionStudy = {
   },
 
   onLocationChange(browser, progress, request, uri) {
+    if (this.state.blockedResources.has(browser)) {
+      this.setPageActionCounter(browser.getRootNode(), 0);
+      this.state.blockedResources.set(browser, 0);
+    }
+
     let doc = browser.getRootNode();
 
     if (doc.location.href == "about:newtab") {
@@ -96,11 +101,11 @@ this.TrackingProtectionStudy = {
 
       // FIXME commented out for testing
       // if (minutes >= 1 && this.blockedRequests) {
-      if (minutes && this.state.totalBlockedResources) {
+      if (this.state.totalBlockedResources) {
         let message = this.newtab_message;
-        message = message.replace("${blockedRequests}", this.blockedRequests);
-        message = message.replace("${blockedEntities}", this.blockedEntities);
-        message = message.replace("${blockedSites}", this.blockedSites);
+        message = message.replace("${blockedRequests}", this.state.blockedRequests);
+        message = message.replace("${blockedEntities}", this.state.blockedEntities);
+        message = message.replace("${blockedSites}", this.state.blockedSites);
         message = message.replace("${minutes}", minutes.toPrecision(3));
 
         let container = doc.getElementById("newtab-margin-top");
