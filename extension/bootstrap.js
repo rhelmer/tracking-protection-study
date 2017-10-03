@@ -50,8 +50,7 @@ this.TrackingProtectionStudy = {
   onOpenWindow(xulWindow) {
     var win = xulWindow.QueryInterface(Ci.nsIInterfaceRequestor)
               .getInterface(Ci.nsIDOMWindowInternal || Ci.nsIDOMWindow);
-
-    this.addEventListeners(win.gBrowser);
+    win.addEventListener("load", () => this.addEventListeners(win.gBrowser), {once: true});
   },
 
   onLocationChange(browser, progress, request, uri, flags) {
@@ -95,6 +94,7 @@ this.TrackingProtectionStudy = {
         newContainer.append(logo);
         newContainer.append(span);
 
+        console.log("rhelmer debug", doc);
         let container = doc.getElementById("newtab-margin-top");
         container.append(newContainer);
       }
@@ -372,7 +372,7 @@ this.TrackingProtectionStudy = {
 
     let url = "chrome://tracking-protection-study/content/tracking-protection-study.css";
     let uri = Services.io.newURI(url);
-    styleSheetService.unregisterSheet(uri);
+    styleSheetService.unregisterSheet(uri, styleSheetService.AGENT_SHEET);
   }
 }
 
