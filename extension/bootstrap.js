@@ -144,8 +144,9 @@ this.TrackingProtectionStudy = {
       let currentHost = currentURI.host;
       let host = new URL(details.originUrl).host;
 
+      // Block third-party requests only.
       if (currentHost != host && blocklists.hostInBlocklist(this.state.blocklist, host)) {
-        // TODO
+        // TODO enable allowed hosts.
         if (this.state.allowedHosts.has(currentHost)) {}
         let counter;
         if (this.state.blockedResources.has(details.browser)) {
@@ -158,13 +159,25 @@ this.TrackingProtectionStudy = {
         this.state.blockedResources.set(details.browser, counter);
         this.state.totalBlockedResources += counter;
 
-        let win = Services.wm.getMostRecentWindow("navigator:browser");
-        if (details.browser == win.gBrowser.selectedBrowser) {
-          this.showPageAction(browser.getRootNode());
-          this.setPageActionCounter(browser.getRootNode(), counter);
-        }
-
+        this.state.blockedResources.set(details.browser, counter);
         result = {cancel: true};
+
+        // Update page counter for the current tab, on all open windows.
+        // The onTabChange handler will handle tab changes within a window.
+        let enumerator = Services.wm.getEnumerator("navigator:browser");
+        while (enumerator.hasMoreElements()) {
+          let win = enumerator.getNext();
+          if (win === Services.appShell.hiddenDOMWindow) {
+            continue;
+          }
+
+          for (let browser of win.gBrowser.browsers) {
+            if (details.browser == win.gBrowser.selectedBrowser) {
+              this.showPageAction(browser.getRootNode());
+              this.setPageActionCounter(browser.getRootNode(), counter);
+            }
+          }
+        }
       }
     }
     return result;
