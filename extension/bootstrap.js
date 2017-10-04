@@ -9,9 +9,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "Services",
   "resource://gre/modules/Services.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "WebRequest",
   "resource://gre/modules/WebRequest.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "MatchPattern",
-  "resource://gre/modules/MatchPattern.jsm");
-
 XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
   "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");
 
@@ -141,7 +138,7 @@ this.TrackingProtectionStudy = {
       button.parentElement.removeChild(button);
     }
     doc.getElementById("tracking")
-    let urlbar = doc.getElementById("urlbar-icons");
+    let urlbar = doc.getElementById("page-action-buttons");
 
     let panel = doc.createElement("panel");
     panel.setAttribute("id", "tracking-protection-study-panel");
@@ -339,7 +336,7 @@ this.TrackingProtectionStudy = {
 
     await blocklists.loadLists(this.state);
 
-    let filter = {urls: new MatchPattern("*://*/*")};
+    let filter = {urls: new win.MatchPatternSet(["*://*/*"])};
     this.onBeforeRequest = this.onBeforeRequest.bind(this);
 
     WebRequest.onBeforeRequest.addListener(this.onBeforeRequest, filter, ["blocking"]);
