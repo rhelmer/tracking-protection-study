@@ -1,18 +1,30 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+"use strict";
+
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+
+Cu.importGlobalProperties(["URL"]);
+
+XPCOMUtils.defineLazyModuleGetter(this, "Services",
+  "resource://gre/modules/Services.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "WebRequest",
+  "resource://gre/modules/WebRequest.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "canonicalizeHost",
   "resource://tracking-protection-study/Canonicalize.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "blocklists",
   "resource://tracking-protection-study/BlockLists.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "Services",
-  "resource://gre/modules/Services.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "WebRequest",
-  "resource://gre/modules/WebRequest.jsm");
+
 XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
   "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");
 
-Cu.importGlobalProperties(["URL"]);
+const EXPORTED_SYMBOLS = ["Study"];
+
+const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
 // TODO disable built-in tracking protection
 // const TRACKING_PROTECTION_PREF = "privacy.trackingprotection.enabled";
@@ -21,7 +33,7 @@ const DOORHANGER_ID = "onboarding-trackingprotection-notification";
 const DOORHANGER_ICON = "chrome://browser/skin/tracking-protection-16.svg#enabled";
 const STYLESHEET_URL = "resource://tracking-protection-study/tracking-protection-study.css";
 
-this.TrackingProtectionStudy = {
+this.Study = {
   /**
    * Open doorhanger-style notification on desired chrome window.
    *
@@ -50,12 +62,12 @@ this.TrackingProtectionStudy = {
   onOpenWindow(xulWindow) {
     var win = xulWindow.QueryInterface(Ci.nsIInterfaceRequestor)
               .getInterface(Ci.nsIDOMWindowInternal || Ci.nsIDOMWindow);
-    win.addEventListener("load", () => this.addEventListeners(win.gBrowser), {once: true});
+    win.addEventListener("load", () => this.addEventListeners(win), {once: true});
   },
 
   onLocationChange(browser, progress, request, uri, flags) {
     if (this.state.blockedResources.has(browser)) {
-      this.showPageAction(browser.getRootNode());
+      this.showPageAction(browser.getRootNode(), 0);
       this.setPageActionCounter(browser.getRootNode(), 0);
       this.state.blockedResources.set(browser, 0);
     }
@@ -67,15 +79,15 @@ this.TrackingProtectionStudy = {
       let currentURI = browser.currentURI;
 
       if (!currentURI) {
-        return;
+        return {};
       }
 
       if (!details.originUrl) {
-        return;
+        return {};
       }
 
       if (currentURI.scheme != "http" && currentURI.scheme != "https") {
-        return;
+        return {};
       }
 
       let currentHost = currentURI.host;
@@ -117,19 +129,23 @@ this.TrackingProtectionStudy = {
           }
 
           if (details.browser == win.gBrowser.selectedBrowser) {
-            this.showPageAction(browser.getRootNode());
+            this.showPageAction(browser.getRootNode(), counter);
             this.setPageActionCounter(browser.getRootNode(), counter);
           }
         }
         return {cancel: true};
       }
     }
+    return {};
   },
 
   /**
-   * Shows the page action button for the current window.
+   * Shows the page action button.
+   *
+   * @param {document} doc - the browser.xul document for the page action.
+   * @param {number} counter - blocked count for the current page.
    */
-  showPageAction(doc) {
+  showPageAction(doc, counter) {
     let win = Services.wm.getMostRecentWindow("navigator:browser");
     let currentHost = win.gBrowser.currentURI.host;
 
@@ -140,16 +156,19 @@ this.TrackingProtectionStudy = {
     doc.getElementById("tracking")
     let urlbar = doc.getElementById("page-action-buttons");
 
-    let panel = doc.createElement("panel");
+    let panel = doc.createElementNS(XUL_NS, "panel");
     panel.setAttribute("id", "tracking-protection-study-panel");
     panel.setAttribute("type", "arrow");
     panel.setAttribute("level", "parent");
-    let panelHbox = doc.createElement("hbox");
+    let panelBox = doc.createElementNS(XUL_NS, "vbox");
 
-    let controls = doc.createElement("vbox");
+    let header = doc.createElementNS(XUL_NS, "label");
+    header.setAttribute("value", `Firefox is blocking ${counter} elements on this page`);
 
-    let group = doc.createElement("radiogroup");
-    let enabled = doc.createElement("radio");
+    let controls = doc.createElementNS(XUL_NS, "hbox");
+
+    let group = doc.createElementNS(XUL_NS, "radiogroup");
+    let enabled = doc.createElementNS(XUL_NS, "radio");
     enabled.setAttribute("label", "Enable on this site");
     enabled.addEventListener("click", () => {
       if (this.state.allowedHosts.has(currentHost)) {
@@ -157,7 +176,7 @@ this.TrackingProtectionStudy = {
       }
       win.gBrowser.reload();
     });
-    let disabled = doc.createElement("radio");
+    let disabled = doc.createElementNS(XUL_NS, "radio");
     disabled.setAttribute("label", "Disable on this site");
     disabled.addEventListener("click", () => {
       this.state.allowedHosts.add(currentHost);
@@ -172,15 +191,18 @@ this.TrackingProtectionStudy = {
     group.append(disabled);
     controls.append(group);
 
-    let footer = doc.createElement("vbox");
-    footer.setAttribute("value", "If the website appears broken, consider disabling" +
-                                  "tracking protection and refreshing the page.");
+    let footer = doc.createElementNS(XUL_NS, "label");
+    footer.setAttribute("value", "If the website appears broken, consider" +
+                                 " disabling tracking protection and" +
+                                 " refreshing the page.");
 
-    panelHbox.append(controls);
-    panelHbox.append(footer);
-    panel.append(panelHbox);
+    panelBox.append(header);
+    panelBox.append(controls);
+    panelBox.append(footer);
 
-    button = doc.createElement("toolbarbutton");
+    panel.append(panelBox);
+
+    button = doc.createElementNS(XUL_NS, "toolbarbutton");
     if (this.state.allowedHosts.has(currentHost)) {
       button.style.backgroundColor = "yellow";
     } else {
@@ -226,17 +248,16 @@ this.TrackingProtectionStudy = {
       let counter = this.state.blockedResources.get(win.gBrowser.selectedBrowser);
 
       if (counter) {
-        this.showPageAction(win.document);
+        this.showPageAction(win.document, counter);
         this.setPageActionCounter(win.document, counter);
       }
     }
   },
 
-  // FIXME need to do this on pageload instead
-  onTabOpen(evt) {
+  onPageLoad(evt) {
     let win = evt.target.ownerGlobal;
     let currentURI = win.gBrowser.currentURI;
-    if (currentURI.spec == "about:newtab") {
+    if (currentURI.spec == "about:newtab" || currentURI.spec == "about:home") {
       let doc = win.gBrowser.contentDocument;
       if (doc.getElementById("tracking-protection-message")) {
         return;
@@ -263,7 +284,7 @@ this.TrackingProtectionStudy = {
         span.style.fontWeight = "lighter";
         span.style.float = "right";
         span.style.padding = "5px";
-        span.innerHTML = message;
+        span.textContent = message;
 
         let newContainer = doc.createElement("div");
         newContainer.id = "tracking-protection-message";
@@ -271,7 +292,7 @@ this.TrackingProtectionStudy = {
         newContainer.append(logo);
         newContainer.append(span);
 
-        let container = doc.getElementById("newtab-margin-top");
+        let container = doc.getElementById("onboarding-overlay-button");
         container.append(newContainer);
       }
     }
@@ -293,6 +314,8 @@ this.TrackingProtectionStudy = {
   },
 
   async init() {
+    this.initContentMessageListener();
+
     // define treatments as STRING: fn(browserWindow, url)
     this.TREATMENTS = {
       doorhanger: this.openDoorhanger,
@@ -307,7 +330,12 @@ this.TrackingProtectionStudy = {
       "Firefox blocked ${blockedRequests} trackers today<br/> and saved you ${minutes} minutes",
       "Firefox blocked ${blockedRequests} ads today from<br/> ${blockedSites} different websites"
     ];
+    let firstrun_urls = [
+      "resource://tracking-protection-study/firstrun.html"
+    ];
     this.newtab_message = newtab_messages[0];
+    this.message = "ok";
+    this.url = firstrun_urls[0];
 
     // run once now on the most recent window.
     let win = Services.wm.getMostRecentWindow("navigator:browser");
@@ -347,26 +375,42 @@ this.TrackingProtectionStudy = {
     // Add listeners to all open windows.
     let enumerator = Services.wm.getEnumerator("navigator:browser");
     while (enumerator.hasMoreElements()) {
-      let win = enumerator.getNext();
+      win = enumerator.getNext();
       if (win === Services.appShell.hiddenDOMWindow) {
         continue;
       }
 
-      let gBrowser = win.gBrowser;
-      this.addEventListeners(gBrowser);
+      this.addEventListeners(win);
     }
 
     // Attach to any new windows.
     Services.wm.addListener(this);
   },
 
-  addEventListeners(gBrowser) {
+  addEventListeners(win) {
     this.onTabChange = this.onTabChange.bind(this);
-    this.onTabOpen = this.onTabOpen.bind(this);
+    this.onPageLoad = this.onPageLoad.bind(this);
 
-    gBrowser.addTabsProgressListener(this);
-    gBrowser.tabContainer.addEventListener("TabSelect", this.onTabChange);
-    gBrowser.tabContainer.addEventListener("TabOpen", this.onTabOpen);
+    if (win && win.gBrowser) {
+      win.gBrowser.addTabsProgressListener(this);
+      win.gBrowser.tabContainer.addEventListener("TabSelect", this.onTabChange);
+      win.addEventListener("load", this.onPageLoad);
+    }
+  },
+
+  /**
+   * Listen and process events from content.
+   */
+  initContentMessageListener() {
+    Services.mm.addMessageListener("TrackingStudy:OnContentMessage", msg => {
+      switch (msg.data.action) {
+        case "get-totals":
+          msg.target.messageManager.sendAsyncMessage("TrackingStudy:Totals", {
+            totalBlockedResources: this.state.totalBlockedResources
+          });
+          break;
+      }
+    });
   },
 
   uninit() {
@@ -386,28 +430,15 @@ this.TrackingProtectionStudy = {
       WebRequest.onBeforeRequest.removeListener(this.onBeforeRequest);
       win.gBrowser.removeTabsProgressListener(this);
       win.gBrowser.tabContainer.removeEventListener("TabSelect", this.onTabChange);
-      win.gBrowser.tabContainer.removeEventListener("TabOpen", this.onTabOpen);
+      win.removeEventListener("load", this.onPageLoad);
 
       Services.wm.removeListener(this);
     }
 
     let uri = Services.io.newURI(STYLESHEET_URL);
     styleSheetService.unregisterSheet(uri, styleSheetService.AGENT_SHEET);
+
+    Cu.unload("resource://tracking-protection-study/Canonicalize.jsm");
+    Cu.unload("resource://tracking-protection-study/BlockLists.jsm");
   }
-}
-
-this.shutdown = function() {
-  TrackingProtectionStudy.uninit();
-  Cu.unload("resource://tracking-protection-study/Blocklists.jsm");
-};
-
-this.install = function(data, reason) {};
-
-this.startup = async function(data, reason) {
-  TrackingProtectionStudy.init();
-};
-
-this.shutdown = this.uninstall = function(data, reason) {
-
-  TrackingProtectionStudy.uninit();
 }

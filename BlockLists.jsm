@@ -44,7 +44,7 @@ const blocklists = {
     const blocklist = new Map()
 
     // remove un-needed categories per disconnect
-    delete data.categories["Content"]
+    delete data.categories.Content
     delete data.categories["Legacy Disconnect"]
     delete data.categories["Legacy Content"]
 
